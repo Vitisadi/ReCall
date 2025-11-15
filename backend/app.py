@@ -3,6 +3,8 @@ import os
 import json
 import threading
 import time
+import re
+from dotenv import load_dotenv
 from pathlib import Path
 from analyzers.face_analyzer import analyze_video
 from analyzers.transcript_analyzer import analyze_transcript
@@ -14,6 +16,9 @@ print("✅ All AI models preloaded (Whisper + InsightFace). Ready to process req
 
 # 🔹 NEW IMPORTS
 from flask import Flask, jsonify, send_from_directory, request
+
+load_dotenv()
+BASE_URL = os.getenv("BASE_URL")
 
 # === PATH SETUP ===
 BASE_DIR = Path(__file__).resolve().parent
@@ -57,7 +62,7 @@ def get_people():
         if face_file.is_file():
             people.append({
                 "name": face_file.stem,
-                "image_url": f"http://localhost:3000/faces/{face_file.name}"
+                "image_url": f"{BASE_URL}/faces/{face_file.name}"
             })
     return jsonify(people)
 
@@ -70,6 +75,58 @@ returns: image file
 def serve_face(filename):
     """Serve face images."""
     return send_from_directory(str(FACES_DIR), filename)
+
+# conversational ai route
+"""
+req: http://localhost:3000/api/people/assistant - POST
+body: { "question": "Where does Parker work?" }
+returns: relevant snippets across all saved conversations
+"""
+@app.route("/api/people/assistant", methods=["POST"])
+def assistant_people():
+    """Return a conversational reply referencing the closest matching person."""
+    payload = request.get_json(silent=True) or {}
+    question = (payload.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "Please provide a question for the assistant."}), 400
+
+    matches = find_relevant_people(question)
+    if not matches:
+        return jsonify({
+            "question": question,
+            "answer": "I could not find any saved conversations yet.",
+            "matches": []
+        })
+
+    top_match = matches[0]
+    for match in matches:
+        match["excerpt"] = _conversation_excerpt(match, window=1)
+
+    excerpt_lines = [
+        f"{turn['speaker']}: {turn['text']}"
+        for turn in (top_match.get("excerpt") or [])
+        if turn.get("text")
+    ]
+
+    if excerpt_lines:
+        answer = "\n".join(excerpt_lines)
+    elif top_match.get("snippet"):
+        answer = (
+            f"{top_match['name']} ({top_match['speaker']}) mentioned "
+            f"\"{top_match['snippet']}\"."
+        )
+    else:
+        answer = (
+            f"I could not find anything specific, but the latest note for "
+            f"{top_match['name']} didn't include a transcript."
+        )
+
+    return jsonify({
+        "question": question,
+        "answer": answer,
+        "match": top_match,
+        "matches": matches
+    })
 
 # return conversation history for a person
 """
@@ -224,6 +281,133 @@ def save_conversation(data):
     existing.append(entry)
     path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     print(f"💾 Conversation history updated for: {name}")
+
+STOPWORDS = {
+    "the", "a", "an", "is", "it", "to", "and", "i", "you", "they", "we", "he", "she",
+    "them", "of", "in", "on", "for", "with", "at", "what", "who", "when", "where",
+    "how", "are", "was", "be", "do", "does", "did", "this", "that", "their"
+}
+
+def _tokenize_text(text):
+    return [w for w in re.findall(r"\w+", text.lower()) if w and w not in STOPWORDS]
+
+def _collect_person_assets():
+    assets = {}
+    for face_file in FACES_DIR.glob("*.*"):
+        assets[face_file.stem.lower()] = {
+            "image_url": f"{BASE_URL}/faces/{face_file.name}" if BASE_URL else None,
+            "profile_url": f"{BASE_URL}/api/conversation/{face_file.stem}" if BASE_URL else None,
+        }
+    return assets
+
+def _conversation_excerpt(match, window=1):
+    conversation = match.get("conversation") or []
+    highlight_index = match.get("highlight_index", -1)
+    if not conversation:
+        return []
+
+    if highlight_index < 0 or highlight_index >= len(conversation):
+        highlight_index = len(conversation) - 1
+
+    start = max(0, highlight_index - window)
+    end = min(len(conversation), highlight_index + window + 1)
+
+    excerpt = []
+    for idx in range(start, end):
+        turn = conversation[idx]
+        excerpt.append({
+            "speaker": turn.get("speaker", "Unknown"),
+            "text": turn.get("text", ""),
+            "is_highlight": idx == highlight_index,
+        })
+    return excerpt
+
+def find_relevant_people(question):
+    """Search every saved conversation for the entry that best answers the question."""
+    tokens = _tokenize_text(question)
+    assets = _collect_person_assets()
+    matches = []
+
+    for conv_file in MEMORY_DIR.glob("*.json"):
+        name = conv_file.stem
+        try:
+            entries = json.loads(conv_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        best_entry = None
+        best_score = -1
+        best_highlight_idx = -1
+        best_timestamp = 0
+
+        for entry in entries:
+            conversation = entry.get("conversation", [])
+            if not conversation:
+                continue
+
+            ts = entry.get("timestamp", 0)
+            entry_score = 0
+            highlight_idx = 0
+            highlight_score = -1
+
+            for idx, turn in enumerate(conversation):
+                text = turn.get("text", "")
+                if not text:
+                    continue
+                lower_text = text.lower()
+                if tokens:
+                    line_score = sum(lower_text.count(tok) for tok in tokens)
+                else:
+                    line_score = 1
+                entry_score += line_score
+
+                if line_score > highlight_score:
+                    highlight_score = line_score
+                    highlight_idx = idx
+
+            if not tokens and entry_score == 0 and conversation:
+                # fallback to most recent line if no tokens extracted
+                entry_score = len(conversation)
+                highlight_idx = len(conversation) - 1
+
+            if entry_score > best_score or (entry_score == best_score and ts > best_timestamp):
+                best_entry = entry
+                best_score = entry_score
+                best_highlight_idx = highlight_idx
+                best_timestamp = ts
+
+        if not best_entry and entries:
+            best_entry = entries[-1]
+            best_timestamp = best_entry.get("timestamp", 0)
+            conv = best_entry.get("conversation", [])
+            best_highlight_idx = len(conv) - 1 if conv else -1
+            best_score = 0
+
+        highlight_turn = None
+        snippet_text = None
+        conversation_block = best_entry.get("conversation", []) if best_entry else []
+        if conversation_block and 0 <= best_highlight_idx < len(conversation_block):
+            highlight_turn = conversation_block[best_highlight_idx]
+            snippet_text = highlight_turn.get("text")
+
+        person_asset = assets.get(name.lower(), {})
+        profile_url = person_asset.get("profile_url")
+        if not profile_url and BASE_URL:
+            profile_url = f"{BASE_URL}/api/conversation/{name}"
+        matches.append({
+            "name": name,
+            "snippet": snippet_text,
+            "speaker": (highlight_turn or {}).get("speaker", "Unknown"),
+            "timestamp": best_timestamp,
+            "score": max(best_score, 0),
+            "conversation": conversation_block,
+            "highlight_index": best_highlight_idx,
+            "profile_url": profile_url,
+            "image_url": person_asset.get("image_url"),
+        })
+
+    matches.sort(key=lambda m: (-m["score"], -m["timestamp"]))
+    return matches
 
 # === START FLASK APP ===
 if __name__ == "__main__":

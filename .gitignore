@@ -1,1 +1,73 @@
 backend/.env
+
+*.pyc
+
+backend/faces_db/*
+backend/faces_db/embeddings.json
+backend/conversations/*
+backend/uploads/*
+
+# ---------------------------
+# Global Python (Flask frontend)
+# ---------------------------
+frontend/__pycache__/
+frontend/**/*.pyc
+frontend/.pytest_cache/
+frontend/instance/
+frontend/.env
+frontend/env/
+frontend/venv/
+frontend/.venv/
+
+# Flask built artifacts
+frontend/*.db
+frontend/*.sqlite3
+
+# ---------------------------
+# Node / Expo React Native (backend)
+# ---------------------------
+backend/node_modules/
+backend/.expo/
+backend/.expo-shared/
+backend/dist/
+backend/build/
+backend/.env
+backend/npm-debug.log
+backend/yarn-error.log
+backend/.cache/
+backend/package-lock.json
+
+# Expo assets cache
+backend/.expo/*
+backend/.expo/*
+
+# Metro bundler cache
+backend/.metro-cache/
+
+# iOS build artifacts (if using Expo prebuild)
+ios/
+*.xcworkspace
+*.xcodeproj
+*.xcuserdatad
+*.xcuserdata
+
+# Android build artifacts
+android/
+*.keystore
+
+# ---------------------------
+# OS / Editor junk
+# ---------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# ---------------------------
+# Root-level virtual / node envs
+# ---------------------------
+venv/
+.env
+.env.*
+node_modules/
