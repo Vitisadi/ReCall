@@ -5,3 +5,7 @@ insightface
 opencv-python
 python-dotenv
 numpy
+moviepy
+google-cloud-speech
+bs4
+selenium
