@@ -9,8 +9,11 @@ from pathlib import Path
 from analyzers.face_analyzer import analyze_video
 from analyzers.transcript_analyzer import analyze_transcript
 from analyzers.enroll_face import enroll
-from analyzers.transcript_analyzer import whisper_model
+# from analyzers.transcript_analyzer import whisper_model
+# from analyzers.face_analyzer import face_app
+# from analyzers.transcript_analyzer import whisper_model
 from analyzers.face_analyzer import face_app
+from services.linkedin_enricher import enrich_linkedin_profile
 from google import genai
 
 print("✅ All AI models preloaded (Whisper + InsightFace). Ready to process requests.")
@@ -255,6 +258,7 @@ def process_video(video_path):
         "video_path": video_path,
         "guessed_name": transcript_result.get("guessed_name"),
         "conversation": transcript_result.get("conversation", []),
+        "keywords": transcript_result.get("keywords", []),
         "face_status": face_result.get("status", "unknown"),
         "face_name": face_result.get("name"),
         "auto_enrolled": face_result.get("auto_enrolled", False),
@@ -277,15 +281,141 @@ def save_conversation(data):
         except Exception:
             print(f"⚠️ Could not parse old file for {name}, resetting it.")
 
-        entry = {
-            "timestamp": int(time.time()),
-            "conversation": data.get("conversation", []),
-            "keywords": data.get("keywords", []),
-        }
+    entry = {
+        "timestamp": int(time.time()),
+        "conversation": data.get("conversation", []),
+        "keywords": data.get("keywords", []),
+    }
+
+    latest_profile = next(
+        (
+            item for item in reversed(existing)
+            if isinstance(item, dict) and item.get("linkedin")
+        ),
+        None
+    )
+    if latest_profile:
+        if latest_profile.get("linkedin"):
+            entry["linkedin"] = latest_profile.get("linkedin")
+        if latest_profile.get("bio"):
+            entry["bio"] = latest_profile.get("bio")
+
     existing.append(entry)
     path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     print(f"💾 Conversation history updated for: {name}")
 
+def enrich_latest_linkedin(name, force=False):
+    """Fetch or update LinkedIn info for the most recent conversation entry."""
+    path = MEMORY_DIR / f"{name}.json"
+    if not path.exists():
+        return None, "missing_file"
+
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None, "invalid_file"
+
+    if not entries:
+        return None, "no_entries"
+
+    latest = entries[-1]
+    existing_info = {
+        "linkedin": latest.get("linkedin"),
+        "bio": latest.get("bio"),
+    }
+
+    if existing_info["linkedin"] and not force:
+        return existing_info, "already_set"
+
+    if not gemini_client:
+        return existing_info if existing_info["linkedin"] else None, "gemini_disabled"
+
+    keywords = latest.get("keywords") or []
+    conversation = latest.get("conversation") or []
+
+    try:
+        profile_info = enrich_linkedin_profile(
+            person_name=name,
+            keywords=keywords,
+            conversation=conversation,
+            gemini_client=gemini_client,
+        )
+    except Exception as exc:
+        print(f"⚠️ LinkedIn enrichment failed for {name}: {exc}")
+        return existing_info if existing_info["linkedin"] else None, "error"
+
+    if not profile_info:
+        return existing_info if existing_info["linkedin"] else None, "no_match"
+
+    latest.update(profile_info)
+    path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
+    return profile_info, "updated"
+
+# rename person endpoint
+@app.route("/api/rename", methods=["POST"])
+def rename_person():
+    """Rename a person's face file, conversation history, and embeddings."""
+    data = request.json
+    old_name = data.get("old_name")
+    new_name = data.get("new_name")
+    
+    if not old_name or not new_name:
+        return jsonify({"error": "Missing old_name or new_name"}), 400
+    
+    old_face = FACES_DIR / f"{old_name.lower()}.jpg"
+    new_face = FACES_DIR / f"{new_name.lower()}.jpg"
+    old_conv = MEMORY_DIR / f"{old_name}.json"
+    new_conv = MEMORY_DIR / f"{new_name}.json"
+    embeddings_path = DB_ROOT / "embeddings.json"
+    
+    try:
+        # Rename face file
+        if old_face.exists():
+            old_face.rename(new_face)
+            print(f"✅ Renamed face: {old_face} -> {new_face}")
+        
+        # Rename conversation file
+        if old_conv.exists():
+            old_conv.rename(new_conv)
+            print(f"✅ Renamed conversation: {old_conv} -> {new_conv}")
+        
+        # Update embeddings.json
+        if embeddings_path.exists():
+            embeddings = json.loads(embeddings_path.read_text(encoding="utf-8"))
+            if old_name in embeddings:
+                # Update the key and the path value
+                embeddings[new_name] = str(new_face)
+                del embeddings[old_name]
+                embeddings_path.write_text(json.dumps(embeddings, indent=2), encoding="utf-8")
+                print(f"✅ Updated embeddings.json: {old_name} -> {new_name}")
+        
+        return jsonify({"success": True, "new_name": new_name})
+    except Exception as e:
+        print(f"❌ Rename failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/conversation/<name>/linkedin", methods=["POST"])
+def enrich_linkedin_endpoint(name):
+    """Trigger LinkedIn lookup for the most recent entry after user confirmation."""
+    payload = request.get_json(silent=True) or {}
+    force = bool(payload.get("force"))
+
+    info, status_key = enrich_latest_linkedin(name, force=force)
+
+    if status_key == "missing_file":
+        return jsonify({"error": f"No conversation found for {name}."}), 404
+    if status_key == "invalid_file":
+        return jsonify({"error": f"Conversation file for {name} is corrupted."}), 500
+    if status_key == "gemini_disabled":
+        return jsonify({"error": "Gemini API not configured."}), 503
+
+    response = {
+        "name": name,
+        "status": status_key,
+        "linkedin": (info or {}).get("linkedin"),
+        "bio": (info or {}).get("bio"),
+    }
+    return jsonify(response)
 STOPWORDS = {
     "the", "a", "an", "is", "it", "to", "and", "i", "you", "they", "we", "he", "she",
     "them", "of", "in", "on", "for", "with", "at", "what", "who", "when", "where",
