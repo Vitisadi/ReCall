@@ -1,0 +1,17 @@
+{
+  "person_id": "4d482d69a01f49448c41b7caf15ee175",
+  "display_name": "Nikul",
+  "created_at": 1762111220,
+  "faces": [
+    {
+      "face_id": "1762111220_f3c80f8955254552",
+      "img": "faces/1762111220_f3c80f8955254552.jpg",
+      "embedding": "faces/1762111220_f3c80f8955254552.npy",
+      "width": 427,
+      "height": 427,
+      "sharpness": 405.0205360381108,
+      "captured_at": 1762111220,
+      "source": "nikul.jpg"
+    }
+  ]
+}

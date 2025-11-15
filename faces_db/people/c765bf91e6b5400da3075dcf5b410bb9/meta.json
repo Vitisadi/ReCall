@@ -1,0 +1,17 @@
+{
+  "person_id": "c765bf91e6b5400da3075dcf5b410bb9",
+  "display_name": "Shimu",
+  "created_at": 1762111512,
+  "faces": [
+    {
+      "face_id": "1762111512_f75a3be280545812",
+      "img": "faces/1762111512_f75a3be280545812.jpg",
+      "embedding": "faces/1762111512_f75a3be280545812.npy",
+      "width": 186,
+      "height": 186,
+      "sharpness": 312.8622561242433,
+      "captured_at": 1762111512,
+      "source": "shimu.jpg"
+    }
+  ]
+}
