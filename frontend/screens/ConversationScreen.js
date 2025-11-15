@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
    View,
    Text,
@@ -11,10 +11,16 @@ import {
 import axios from 'axios';
 import { BASE_URL } from '../config';
 
-export default function ConversationScreen({ name, onBack }) {
+export default function ConversationScreen({
+   name,
+   highlightTimestamp,
+   highlightIndex,
+   onBack,
+}) {
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState(null);
    const [data, setData] = useState([]);
+   const listRef = useRef(null);
 
    useEffect(() => {
       let mounted = true;
@@ -39,20 +45,56 @@ export default function ConversationScreen({ name, onBack }) {
       };
    }, [name]);
 
+   const scrollToHighlight = useCallback(() => {
+      if (!highlightTimestamp || !data.length || !listRef.current) return;
+      const entryIndex = data.findIndex(
+         (entry) => entry.timestamp === highlightTimestamp
+      );
+      if (entryIndex < 0) return;
+
+      requestAnimationFrame(() => {
+         listRef.current?.scrollToIndex({
+            index: entryIndex,
+            animated: true,
+         });
+      });
+   }, [data, highlightTimestamp]);
+
+   useEffect(() => {
+      scrollToHighlight();
+   }, [scrollToHighlight]);
+
    const renderEntry = ({ item }) => {
       // item is expected to be { timestamp, conversation }
       const ts = item.timestamp
          ? new Date(item.timestamp * 1000).toLocaleString()
          : '';
+      const isHighlightedEntry =
+         Boolean(highlightTimestamp) && item.timestamp === highlightTimestamp;
+      const messageHighlightIndex =
+         isHighlightedEntry && Number.isInteger(highlightIndex)
+            ? highlightIndex
+            : -1;
+
       return (
-         <View style={styles.entry}>
+         <View
+            style={[styles.entry, isHighlightedEntry && styles.entryHighlight]}
+         >
             <Text style={styles.ts}>{ts}</Text>
             {Array.isArray(item.conversation) ? (
                item.conversation.map((m, i) => {
                   // m may be a string or an object like { speaker, text }
                   if (typeof m === 'string') {
                      return (
-                        <Text key={i} style={styles.msg}>
+                        <Text
+                           key={i}
+                           style={[
+                              styles.msg,
+                              isHighlightedEntry &&
+                                 i === messageHighlightIndex &&
+                                 styles.msgHighlight,
+                           ]}
+                        >
                            {m}
                         </Text>
                      );
@@ -61,14 +103,30 @@ export default function ConversationScreen({ name, onBack }) {
                      const speaker = m.speaker ? `${m.speaker}: ` : '';
                      const text = m.text != null ? m.text : JSON.stringify(m);
                      return (
-                        <Text key={i} style={styles.msg}>
+                        <Text
+                           key={i}
+                           style={[
+                              styles.msg,
+                              isHighlightedEntry &&
+                                 i === messageHighlightIndex &&
+                                 styles.msgHighlight,
+                           ]}
+                        >
                            {speaker}
                            {text}
                         </Text>
                      );
                   }
                   return (
-                     <Text key={i} style={styles.msg}>
+                     <Text
+                        key={i}
+                        style={[
+                           styles.msg,
+                           isHighlightedEntry &&
+                              i === messageHighlightIndex &&
+                              styles.msgHighlight,
+                        ]}
+                     >
                         {String(m)}
                      </Text>
                   );
@@ -102,10 +160,16 @@ export default function ConversationScreen({ name, onBack }) {
 
          {!loading && !error && (
             <FlatList
+               ref={listRef}
                data={data}
                keyExtractor={(item, idx) => String(item.timestamp || idx)}
                renderItem={renderEntry}
                contentContainerStyle={{ padding: 16 }}
+               onScrollToIndexFailed={({ index }) => {
+                  setTimeout(() => {
+                     listRef.current?.scrollToIndex({ index, animated: true });
+                  }, 200);
+               }}
             />
          )}
       </View>
@@ -165,6 +229,11 @@ const styles = StyleSheet.create({
       padding: 12,
       borderRadius: 8,
    },
+   entryHighlight: {
+      borderWidth: 1,
+      borderColor: '#f2c94c',
+      backgroundColor: '#fffbe6',
+   },
    ts: {
       fontSize: 12,
       color: '#666',
@@ -185,6 +254,12 @@ const styles = StyleSheet.create({
             : Platform.OS === 'android'
             ? 'monospace'
             : 'Courier New',
+      paddingVertical: 2,
+   },
+   msgHighlight: {
+      backgroundColor: '#ffe9a6',
+      borderRadius: 4,
+      paddingHorizontal: 4,
    },
    error: { color: '#a00', padding: 16 },
 });

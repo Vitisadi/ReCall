@@ -287,6 +287,7 @@ STOPWORDS = {
     "them", "of", "in", "on", "for", "with", "at", "what", "who", "when", "where",
     "how", "are", "was", "be", "do", "does", "did", "this", "that", "their"
 }
+SELF_SPEAKER_LABELS = {"me", "myself", "user"}
 
 def _tokenize_text(text):
     return [w for w in re.findall(r"\w+", text.lower()) if w and w not in STOPWORDS]
@@ -359,6 +360,14 @@ def find_relevant_people(question):
                     line_score = sum(lower_text.count(tok) for tok in tokens)
                 else:
                     line_score = 1
+
+                speaker_label = (turn.get("speaker") or "").strip().lower()
+                if line_score > 0:
+                    if speaker_label and speaker_label not in SELF_SPEAKER_LABELS:
+                        line_score *= 1.6
+                    elif speaker_label in SELF_SPEAKER_LABELS:
+                        line_score *= 0.6
+
                 entry_score += line_score
 
                 if line_score > highlight_score:
@@ -392,8 +401,14 @@ def find_relevant_people(question):
 
         person_asset = assets.get(name.lower(), {})
         profile_url = person_asset.get("profile_url")
-        if not profile_url and BASE_URL:
-            profile_url = f"{BASE_URL}/api/conversation/{name}"
+        if BASE_URL:
+            query_parts = []
+            if best_timestamp:
+                query_parts.append(f"ts={best_timestamp}")
+            if best_highlight_idx is not None and best_highlight_idx >= 0:
+                query_parts.append(f"highlight={best_highlight_idx}")
+            query = f"?{'&'.join(query_parts)}" if query_parts else ""
+            profile_url = f"{BASE_URL}/api/conversation/{name}{query}"
         matches.append({
             "name": name,
             "snippet": snippet_text,
