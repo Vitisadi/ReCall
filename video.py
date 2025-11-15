@@ -13,6 +13,8 @@ import numpy as np
 import whisper
 import face_recognition
 
+VIDEO_PATH = "/Users/nikul/Desktop/hack/tim_nikul.MP4"
+OUTPUT_DIR = os.path.join(os.path.dirname(VIDEO_PATH), "faces_unique")
 
 # --------------------------- config ---------------------------
 
