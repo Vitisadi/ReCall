@@ -71,3 +71,15 @@ venv/
 .env
 .env.*
 node_modules/
+
+# Ignore everything inside these folders
+conversations/**
+faces_db/**
+faces_db/faces/**
+faces_db/temp_crops/**
+
+# But keep the folders themselves
+!conversations/
+!faces_db/
+!faces_db/faces/
+!faces_db/temp_crops/
