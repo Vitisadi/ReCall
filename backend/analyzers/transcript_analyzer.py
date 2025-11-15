@@ -1,105 +1,256 @@
 import os
-import time
 import json
-import whisper
+import time
+from moviepy import VideoFileClip
+from google.cloud.speech_v2 import SpeechClient
+from google.cloud.speech_v2.types import cloud_speech
+from google.api_core.client_options import ClientOptions
 from dotenv import load_dotenv
 from google import genai
 
-# === Gemini setup ===
+# ============================================================
+# GOOGLE + GEMINI SETUP
+# ============================================================
 load_dotenv()
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
+    os.path.dirname(__file__),
+    "google_key.json"
+)
+
+PROJECT_ID = "red-atlas-478321-k3"
+REGION = "us"
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=GEMINI_API_KEY)
+client_gem = genai.Client(api_key=GEMINI_API_KEY)
 
-# === 🧠 Preload Whisper model once globally ===
-print("🔊 Loading Whisper model (small)...")
-whisper_model = whisper.load_model("small")  # preload once
+VIDEO_PATH = "../../videos/parker.mp4"
 
-def analyze_transcript(video_path: str):
-    """
-    Transcribe the input video and analyze the conversation using Gemini.
-    Returns a structured dict with guessed name and dialogue.
-    """
-    print(f"🎙️ Transcribing {video_path} ...")
+# ============================================================
+# 1. Extract Audio (MP4 → WAV)
+# ============================================================
+def extract_audio(video_path):
+    wav_path = "temp_audio.wav"
+    clip = VideoFileClip(video_path)
+    clip.audio.write_audiofile(wav_path, logger=None)
+    return wav_path
 
-    curr_time = time.time()
-
-    # === Step 1: Transcribe audio ===
-    try:
-        result = whisper_model.transcribe(video_path, language="English", fp16=False)
-    except Exception as e:
-        print(f"❌ Whisper error: {e}")
-        return {"guessed_name": None, "conversation": [], "raw_text": "", "error": str(e)}
-
-    transcript_text = "\n".join(
-        [f"[{seg['start']:.2f}s–{seg['end']:.2f}s]: {seg['text']}" for seg in result["segments"]]
+# ============================================================
+# 2. Google Cloud Chirp 3 Transcription + DIARIZATION
+# ============================================================
+def transcribe_diarization(audio_path):
+    client = SpeechClient(
+        client_options=ClientOptions(
+            api_endpoint=f"{REGION}-speech.googleapis.com"
+        )
     )
 
-    print(f"✅ Transcription complete in {time.time() - curr_time:.2f} seconds.")
+    with open(audio_path, "rb") as f:
+        audio_content = f.read()
 
-    # === Step 2: Create Gemini prompt ===
+    config = cloud_speech.RecognitionConfig(
+        auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
+        language_codes=["en-US"],
+        model="chirp_3",
+        features=cloud_speech.RecognitionFeatures(
+            diarization_config=cloud_speech.SpeakerDiarizationConfig()
+        ),
+    )
+
+    request = cloud_speech.RecognizeRequest(
+        recognizer=f"projects/{PROJECT_ID}/locations/{REGION}/recognizers/_",
+        config=config,
+        content=audio_content,
+    )
+
+    return client.recognize(request=request)
+
+# ============================================================
+# 3. Convert diarization → clean transcript w/ Speaker 0 & 1
+# ============================================================
+def build_transcript(response):
+    all_words = []
+
+    for result in response.results:
+        alt = result.alternatives[0]
+        for w in alt.words:
+            speaker = w.speaker_label if hasattr(w, "speaker_label") else 0
+            all_words.append({
+                "speaker": speaker,
+                "word": w.word,
+                "start": w.start_offset.total_seconds()
+            })
+
+    all_words.sort(key=lambda x: x["start"])
+
+    # Group into sentences
+    sentences = []
+    curr_speaker = None
+    curr_sentence = []
+
+    for w in all_words:
+        if w["speaker"] != curr_speaker:
+            if curr_sentence:
+                sentences.append({
+                    "speaker": curr_speaker,
+                    "text": " ".join(curr_sentence)
+                })
+            curr_speaker = w["speaker"]
+            curr_sentence = [w["word"]]
+        else:
+            curr_sentence.append(w["word"])
+
+    if curr_sentence:
+        sentences.append({
+            "speaker": curr_speaker,
+            "text": " ".join(curr_sentence)
+        })
+
+    return sentences
+
+# ============================================================
+# 4. Send clean transcript to Gemini for Name + Keywords
+# ============================================================
+def ask_gemini(sentences):
+    conv_text = "\n".join(
+        f"{i+1}. [Speaker {s['speaker']}]: {s['text']}"
+        for i, s in enumerate(sentences)
+    )
+
     prompt = f"""
-    You are an intelligent assistant analyzing a transcript of a short two-person conversation.
+    You are given a conversation between two speakers:
 
-    Context:
-    - The person speaking in the video starts the conversation.
-    - The first personal name that appears immediately after any greeting word 
-    (such as "hi", "hey", "hello", "good morning", "good afternoon", "what’s up", "yo", etc.)
-    belongs to the **other person** being spoken to.
-    - That detected name remains the other person’s name throughout the conversation — 
-    even if the speaker’s own name is mentioned later (for example, "Hi Jimmy" → guessed_name = Jimmy, 
-    even if "Nicko" appears later).
+    - **Speaker 0** = "Me" (the person wearing glasses)
+    - **Speaker 1** = The other person whose name you must determine
+
+    Conversation:
+    {conv_text}
 
     Your tasks:
-    1. Detect the first human name that follows a greeting word — that is the other person's name.
-    2. Use "Me" for the speaker in the video, and the detected name for the other person.
-    3. Output valid JSON **only**, following this exact structure:
+
+    1. Identify the **other person's name** using strict, expanded rules:
+
+    A. DIRECT INTRODUCTIONS (Most Reliable)
+        - If Speaker 1 says: 
+            “I’m X”, “My name is X”, “This is X”, “You can call me X”
+          → X is the other person's name.
+
+        - If Speaker 0 says:
+            “Nice to meet you, X”, “Good to meet you, X”, “Hi X”, “Hello X”
+          → X is the other person's name.
+
+    B. INDIRECT OR DELAYED INTRODUCTIONS
+        - If Speaker 1 mentions:
+            “People call me X”, “Everyone knows me as X”
+          → X is the name.
+
+        - If Speaker 1 mentions:
+            “I go by X”, “My friends call me X”
+          → X is the name.
+
+    C. MULTIPLE NAMES APPEARING IN THE CONVERSATION
+        - If two names appear:
+            • The FIRST name mentioned belongs to Speaker 0 (“Me”)
+            • The SECOND belongs to Speaker 1 (the other person).
+
+        - If Speaker 0 introduces themselves FIRST:
+            “I’m Nikul” → that is Speaker 0’s name, NOT the other person.
+
+        - If both speakers introduce themselves:
+            Use Speaker 1’s introduction.
+
+    D. GREETING SCENARIOS
+        - If Speaker 0 says:
+            “Hey X”, “What’s up X?”, “Yo X”, “Thanks X”
+          → X is the other person's name.
+
+        - Names spoken casually still count:
+            “So X, what do you think?”
+          → X is the other person's name.
+
+    E. WHEN A THIRD PERSON IS MENTIONED
+        - If a name appears in the context of a THIRD person:
+            “I talked to John yesterday” → John is NOT the other person.
+        - The name must refer to the **active speaking partner**.
+
+    F. QUESTIONS ABOUT THE OTHER PERSON'S NAME
+        - If Speaker 0 asks:
+            “What was your name again?” or “Sorry, what’s your name?”
+          Then whichever name Speaker 1 responds with is the correct name.
+
+    G. NICKNAMES & SHORTENED NAMES
+        - If Speaker 1 says something like:
+            “I’m Jonathan, but call me Jon”
+          → Use the name they prefer (Jon).
+
+    H. PRONOUNS & REFERENCES
+        - If someone says:
+            “I’m X by the way”
+          → X is the other person’s name.
+
+    I. NO NAME FOUND ANYWHERE
+        - If no rule above results in a name:
+            → guessed_name = "Other"
+        - Never invent or hallucinate a name.
+
+    2. Transform the transcript into JSON with labeled speakers:
+    Speaker 0 → "Me"
+    Speaker 1 → "<guessed_name>"
+
+    3. Extract up to 6 **search keywords** about the other person:
+    - Company names
+    - Schools
+    - Locations
+    - Job titles
+
+    Output **pure JSON only** in this format:
 
     {{
-    "guessed_name": "<detected name or 'Other Person'>",
+    "guessed_name": "Name or 'Other'",
     "conversation": [
         {{
         "speaker": "Me" or "<guessed_name>",
-        "text": "<exact line from transcript>"
+        "text": "the spoken line"
         }}
-    ]
+    ],
+    "keywords": ["keyword1", "keyword2"]
     }}
-
-    Rules:
-    - Output must be valid JSON (no markdown, comments, or text outside the JSON).
-    - Keep each spoken line exactly as it appears.
-    - Use only the first detected name after a greeting.
-    - Ignore all other names mentioned later.
-    - If no name is detected, set guessed_name = "Other Person".
-
-    Transcript:
-    {transcript_text}
     """
 
-    # === Step 3: Call Gemini ===
-    try:
-        response = client.models.generate_content(model="gemini-2.0-flash-lite", contents=prompt)
-        text_output = response.text.strip()
-        print(f"✅ Gemini response received in {time.time() - curr_time:.2f} seconds.")
-    except Exception as e:
-        print(f"❌ Gemini API error: {e}")
-        return {"guessed_name": None, "conversation": [], "raw_text": transcript_text, "error": str(e)}
+    response = client_gem.models.generate_content(
+        model="gemini-2.0-flash-lite",
+        contents=prompt
+    )
 
-    # === Step 4: Validate Gemini response ===
-    try:
-        if text_output.startswith("```"):
-            text_output = text_output.strip("`").replace("json", "").strip()
-        data = json.loads(text_output)
-        print(f"✅ Transcript analysis complete. Guessed name: {data.get('guessed_name')}")
-        return {
-            "guessed_name": data.get("guessed_name"),
-            "conversation": data.get("conversation", []),
-            "raw_text": transcript_text
-        }
-    except json.JSONDecodeError:
-        print("⚠️ Gemini output was not valid JSON, returning fallback.")
-        return {
-            "guessed_name": None,
-            "conversation": [],
-            "raw_text": transcript_text,
-            "gemini_raw": text_output
-        }
+    text_output = response.text.strip()
+    
+    # Remove markdown code blocks if present
+    if text_output.startswith("```"):
+        lines = text_output.split("\n")
+        text_output = "\n".join(lines[1:-1])  # Remove first and last lines
+        if text_output.startswith("json"):
+            text_output = text_output[4:].strip()
+    
+    return json.loads(text_output)
+
+# ============================================================
+# MAIN PIPELINE
+# ============================================================
+def analyze_video(video_path):
+    audio_path = extract_audio(video_path)
+    g_response = transcribe_diarization(audio_path)
+    sentences = build_transcript(g_response)
+    final_json = ask_gemini(sentences)
+    return final_json
+
+# Alias for app.py compatibility
+def analyze_transcript(video_path):
+    """Alias for analyze_video to match app.py import."""
+    return analyze_video(video_path)
+
+# ============================================================
+# RUN
+# ============================================================
+if __name__ == "__main__":
+    result = analyze_video(VIDEO_PATH)
+    print(json.dumps(result, indent=2))
