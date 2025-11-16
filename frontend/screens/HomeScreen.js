@@ -265,8 +265,12 @@ export default function HomeScreen({ onOpenConversation, onNavigateTab }) {
    }, [nodes, width, graphHeight]);
 
    const totalPeople = nodes.length;
-   const activeMemories = useMemo(
-      () => nodes.filter((person) => (person?.conversationWeight || 0) > 0).length,
+   const totalSnippets = useMemo(
+      () =>
+         nodes.reduce(
+            (sum, person) => sum + (person?.conversationWeight || 0),
+            0
+         ),
       [nodes]
    );
 
@@ -293,7 +297,7 @@ export default function HomeScreen({ onOpenConversation, onNavigateTab }) {
 
    const heroStats = [
       { label: 'People Logged', value: totalPeople },
-      { label: 'Active Memories', value: activeMemories },
+      { label: 'Threads Logged', value: totalSnippets },
       { label: 'Upcoming Highlights', value: highlightsPreview.length },
    ];
 

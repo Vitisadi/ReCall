@@ -359,6 +359,14 @@ export default function ConversationScreen({
                      {displayHeadline ? (
                         <Text style={styles.profileHeadline}>{displayHeadline}</Text>
                      ) : null}
+                     {linkedinUrl ? (
+                        <TouchableOpacity
+                           onPress={() => Linking.openURL(linkedinUrl)}
+                           style={styles.linkedinLinkWrapper}
+                        >
+                           <Text style={styles.linkedinLink}>View LinkedIn</Text>
+                        </TouchableOpacity>
+                     ) : null}
                   </View>
                </View>
 
@@ -402,18 +410,6 @@ export default function ConversationScreen({
                      </View>
                   </>
                )}
-               <Text style={styles.profileName}>{name}</Text>
-               {displayHeadline ? (
-                  <Text style={styles.profileHeadline}>{displayHeadline}</Text>
-               ) : null}
-               {linkedinUrl ? (
-                  <TouchableOpacity
-                     onPress={() => Linking.openURL(linkedinUrl)}
-                     style={styles.linkedinLinkWrapper}
-                  >
-                     <Text style={styles.linkedinLink}>View LinkedIn Profile</Text>
-                  </TouchableOpacity>
-               ) : null}
             </View>
          </KeyboardAvoidingView>
 
