@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+   useCallback,
+   useEffect,
+   useMemo,
+   useRef,
+   useState,
+} from 'react';
 import {
    View,
    Text,
@@ -16,7 +22,9 @@ import {
    Keyboard,
 } from 'react-native';
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BASE_URL } from '../config';
+import { retroFonts, retroPalette, retroMenuItems } from '../styles/retroTheme';
 
 export default function ConversationScreen({
    name,
@@ -100,7 +108,10 @@ export default function ConversationScreen({
                   if (conversations[i].linkedin_url) {
                      setLinkedinUrl(conversations[i].linkedin_url);
                   }
-                  if (conversations[i].headline || conversations[i].linkedin_url) {
+                  if (
+                     conversations[i].headline ||
+                     conversations[i].linkedin_url
+                  ) {
                      break;
                   }
                }
@@ -120,7 +131,8 @@ export default function ConversationScreen({
    }, [name]);
 
    const scrollToHighlight = useCallback(() => {
-      if (!activeHighlight.timestamp || !data.length || !listRef.current) return;
+      if (!activeHighlight.timestamp || !data.length || !listRef.current)
+         return;
       const entryIndex = data.findIndex(
          (entry) => entry.timestamp === activeHighlight.timestamp
       );
@@ -190,7 +202,10 @@ export default function ConversationScreen({
          if (!isHighlightedEntry) {
             return new Set();
          }
-         if (Array.isArray(item.highlight_indices) && item.highlight_indices.length) {
+         if (
+            Array.isArray(item.highlight_indices) &&
+            item.highlight_indices.length
+         ) {
             return new Set(item.highlight_indices);
          }
          if (
@@ -288,8 +303,10 @@ export default function ConversationScreen({
          });
          const payload = res.data || {};
          const normalizedTarget = (name || '').trim().toLowerCase();
-         const normalizedMatch =
-            (payload.match?.name || '').toString().trim().toLowerCase();
+         const normalizedMatch = (payload.match?.name || '')
+            .toString()
+            .trim()
+            .toLowerCase();
          if (
             normalizedTarget &&
             normalizedMatch &&
@@ -333,88 +350,120 @@ export default function ConversationScreen({
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
          >
-            <View style={styles.container}>
-               <View style={styles.header}>
-                  <TouchableOpacity
-                     onPress={onBack}
-                     style={styles.backBtn}
-                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  >
-                     <Text style={styles.backText}>←</Text>
-                  </TouchableOpacity>
-                  <View style={styles.profileBubble}>
-                     {avatarUrl ? (
-                        <Image
-                           source={{ uri: avatarUrl }}
-                           style={styles.profileAvatar}
-                        />
-                     ) : (
-                        <View style={styles.profileAvatarFallback}>
-                           <Text style={styles.profileAvatarFallbackText}>
-                              {initials}
-                           </Text>
+            <LinearGradient
+               colors={[retroPalette.sunsetStart, retroPalette.sunsetEnd]}
+               style={styles.gradient}
+            >
+               <View style={styles.window}>
+                  <View style={styles.menuBar}>
+                     {retroMenuItems.map((item) => (
+                        <Text key={item} style={styles.menuItem}>
+                           {item}
+                        </Text>
+                     ))}
+                     <View style={styles.menuLed} />
+                  </View>
+                  <View style={styles.windowBody}>
+                     <View style={styles.header}>
+                        <TouchableOpacity
+                           onPress={onBack}
+                           style={styles.backBtn}
+                           hitSlop={{
+                              top: 12,
+                              bottom: 12,
+                              left: 12,
+                              right: 12,
+                           }}
+                        >
+                           <Text style={styles.backText}>←</Text>
+                        </TouchableOpacity>
+                        <View style={styles.profileBubble}>
+                           {avatarUrl ? (
+                              <Image
+                                 source={{ uri: avatarUrl }}
+                                 style={styles.profileAvatar}
+                              />
+                           ) : (
+                              <View style={styles.profileAvatarFallback}>
+                                 <Text style={styles.profileAvatarFallbackText}>
+                                    {initials}
+                                 </Text>
+                              </View>
+                           )}
+                           <Text style={styles.profileName}>{name}</Text>
+                           {displayHeadline ? (
+                              <Text style={styles.profileHeadline}>
+                                 {displayHeadline}
+                              </Text>
+                           ) : null}
                         </View>
+                     </View>
+
+                     {loading && (
+                        <ActivityIndicator
+                           size='large'
+                           color={retroPalette.violet}
+                           style={{ marginTop: 20 }}
+                        />
+                     )}
+                     {error && <Text style={styles.error}>{error}</Text>}
+
+                     {!loading && !error && (
+                        <>
+                           <FlatList
+                              ref={listRef}
+                              data={data}
+                              keyExtractor={(item, idx) =>
+                                 String(item.timestamp || idx)
+                              }
+                              renderItem={renderEntry}
+                              style={styles.list}
+                              contentContainerStyle={styles.listContent}
+                              keyboardShouldPersistTaps='handled'
+                              onContentSizeChange={ensureScrolledToEnd}
+                              onScrollToIndexFailed={({ index }) => {
+                                 setTimeout(() => {
+                                    listRef.current?.scrollToIndex({
+                                       index,
+                                       animated: true,
+                                    });
+                                 }, 200);
+                              }}
+                           />
+                           <View style={styles.assistantTriggerShell}>
+                              <TouchableOpacity
+                                 style={styles.assistantTrigger}
+                                 activeOpacity={0.9}
+                                 onPress={openAssistantModal}
+                              >
+                                 <Text style={styles.assistantTriggerText}>
+                                    {personAssistantResult?.question
+                                       ? `You: ${personAssistantResult.question}`
+                                       : `Ask about ${assistantDisplayName}`}
+                                 </Text>
+                              </TouchableOpacity>
+                           </View>
+                        </>
                      )}
                      <Text style={styles.profileName}>{name}</Text>
                      {displayHeadline ? (
-                        <Text style={styles.profileHeadline}>{displayHeadline}</Text>
+                        <Text style={styles.profileHeadline}>
+                           {displayHeadline}
+                        </Text>
+                     ) : null}
+                     {linkedinUrl ? (
+                        <TouchableOpacity
+                           onPress={() => Linking.openURL(linkedinUrl)}
+                           style={styles.linkedinLinkWrapper}
+                        >
+                           <Text style={styles.linkedinLink}>
+                              View LinkedIn Profile
+                           </Text>
+                        </TouchableOpacity>
                      ) : null}
                   </View>
                </View>
-
-               {loading && (
-                  <ActivityIndicator size='large' style={{ marginTop: 20 }} />
-               )}
-               {error && <Text style={styles.error}>{error}</Text>}
-
-               {!loading && !error && (
-                  <>
-                     <FlatList
-                        ref={listRef}
-                        data={data}
-                        keyExtractor={(item, idx) => String(item.timestamp || idx)}
-                        renderItem={renderEntry}
-                        style={styles.list}
-                        contentContainerStyle={styles.listContent}
-                        keyboardShouldPersistTaps='handled'
-                        onContentSizeChange={ensureScrolledToEnd}
-                        onScrollToIndexFailed={({ index }) => {
-                           setTimeout(() => {
-                              listRef.current?.scrollToIndex({
-                                 index,
-                                 animated: true,
-                              });
-                           }, 200);
-                        }}
-                     />
-                     <View style={styles.assistantTriggerShell}>
-                        <TouchableOpacity
-                           style={styles.assistantTrigger}
-                           activeOpacity={0.9}
-                           onPress={openAssistantModal}
-                        >
-                           <Text style={styles.assistantTriggerText}>
-                              {personAssistantResult?.question
-                                 ? `You: ${personAssistantResult.question}`
-                                 : `Ask about ${assistantDisplayName}`}
-                           </Text>
-                        </TouchableOpacity>
-                     </View>
-                  </>
-               )}
-               <Text style={styles.profileName}>{name}</Text>
-               {displayHeadline ? (
-                  <Text style={styles.profileHeadline}>{displayHeadline}</Text>
-               ) : null}
-               {linkedinUrl ? (
-                  <TouchableOpacity
-                     onPress={() => Linking.openURL(linkedinUrl)}
-                     style={styles.linkedinLinkWrapper}
-                  >
-                     <Text style={styles.linkedinLink}>View LinkedIn Profile</Text>
-                  </TouchableOpacity>
-               ) : null}
-            </View>
+            </LinearGradient>
          </KeyboardAvoidingView>
 
          <Modal
@@ -447,7 +496,10 @@ export default function ConversationScreen({
                      </View>
                      {personAssistantError ? (
                         <Text
-                           style={[styles.assistantErrorMessage, styles.modalError]}
+                           style={[
+                              styles.assistantErrorMessage,
+                              styles.modalError,
+                           ]}
                         >
                            {personAssistantError}
                         </Text>
@@ -463,7 +515,9 @@ export default function ConversationScreen({
                               <Text style={styles.assistantQuestion}>
                                  {personAssistantResult.question}
                               </Text>
-                              <Text style={styles.assistantLabel}>Assistant</Text>
+                              <Text style={styles.assistantLabel}>
+                                 Assistant
+                              </Text>
                               {personAssistantResult.answer ? (
                                  <Text style={styles.assistantAnswer}>
                                     {personAssistantResult.answer}
@@ -474,7 +528,9 @@ export default function ConversationScreen({
                                     {personAssistantResult.suggestion}
                                  </Text>
                               ) : null}
-                              {Array.isArray(personAssistantResult.match?.excerpt) &&
+                              {Array.isArray(
+                                 personAssistantResult.match?.excerpt
+                              ) &&
                               personAssistantResult.match.excerpt.length > 0 ? (
                                  <View style={styles.assistantExcerpt}>
                                     {personAssistantResult.match.excerpt.map(
@@ -488,7 +544,9 @@ export default function ConversationScreen({
                                              ]}
                                           >
                                              <Text
-                                                style={styles.assistantExcerptSpeaker}
+                                                style={
+                                                   styles.assistantExcerptSpeaker
+                                                }
                                              >
                                                 {turn.speaker}:{' '}
                                              </Text>
@@ -501,7 +559,9 @@ export default function ConversationScreen({
                               {personAssistantResult.match?.timestamp ? (
                                  <TouchableOpacity
                                     onPress={() => {
-                                       applyMatchHighlight(personAssistantResult.match);
+                                       applyMatchHighlight(
+                                          personAssistantResult.match
+                                       );
                                        closeAssistantModal();
                                     }}
                                     style={styles.assistantLink}
@@ -514,8 +574,8 @@ export default function ConversationScreen({
                            </View>
                         ) : (
                            <Text style={styles.assistantPlaceholder}>
-                              Ask a question about {assistantDisplayName} to see AI
-                              answers here.
+                              Ask a question about {assistantDisplayName} to see
+                              AI answers here.
                            </Text>
                         )}
                      </ScrollView>
@@ -543,9 +603,14 @@ export default function ConversationScreen({
                                  disabled={personAssistantLoading}
                               >
                                  {personAssistantLoading ? (
-                                    <ActivityIndicator size='small' color='#000' />
+                                    <ActivityIndicator
+                                       size='small'
+                                       color='#000'
+                                    />
                                  ) : (
-                                    <Text style={styles.modalSendText}>Send</Text>
+                                    <Text style={styles.modalSendText}>
+                                       Send
+                                    </Text>
                                  )}
                               </TouchableOpacity>
                            </View>
@@ -568,92 +633,128 @@ export default function ConversationScreen({
    );
 }
 
-const baseMono =
-   Platform.OS === 'ios'
-      ? 'American Typewriter'
-      : Platform.OS === 'android'
-      ? 'monospace'
-      : 'Courier New';
+const baseMono = retroFonts.base;
 
 const styles = StyleSheet.create({
-   container: { flex: 1, backgroundColor: '#fff' },
-   header: {
-      paddingTop: 16,
+   gradient: { flex: 1 },
+   window: {
+      flex: 1,
+      margin: 12,
+      borderRadius: 24,
+      marginTop: 36,
+      borderWidth: 3,
+      borderColor: retroPalette.outline,
+      backgroundColor: retroPalette.warmSand,
+      shadowColor: '#1b0f2c',
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      overflow: 'hidden',
+   },
+   menuBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: retroPalette.menuGray,
+      paddingHorizontal: 18,
+      paddingTop: 10,
       paddingBottom: 8,
-      paddingHorizontal: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-      backgroundColor: '#fff',
+      borderBottomWidth: 2,
+      borderBottomColor: retroPalette.outline,
+   },
+   menuItem: {
+      marginRight: 18,
+      fontSize: 13,
+      color: retroPalette.menuText,
+      fontFamily: retroFonts.heading,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+   },
+   menuLed: {
+      marginLeft: 'auto',
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: retroPalette.teal,
+      borderWidth: 1,
+      borderColor: retroPalette.outline,
+   },
+   windowBody: {
+      flex: 1,
+      padding: 18,
+   },
+   header: {
+      paddingBottom: 12,
    },
    backBtn: {
       width: 36,
       height: 28,
-      borderWidth: 1,
-      borderColor: '#000',
-      borderRadius: 8,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      backgroundColor: retroPalette.lilac,
+      borderRadius: 6,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 10,
    },
    backText: {
       fontSize: 18,
-      color: '#000',
+      color: retroPalette.warmSand,
       fontWeight: '700',
       fontFamily: baseMono,
    },
    profileBubble: {
-      borderWidth: 1,
-      borderColor: '#000',
-      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 24,
       paddingVertical: 14,
       paddingHorizontal: 16,
       alignItems: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: '#fef3e2',
       alignSelf: 'center',
       width: '100%',
       maxWidth: 340,
-      shadowColor: '#000',
-      shadowOpacity: 0.08,
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.16,
       shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 4,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: 6,
    },
    profileAvatar: {
       width: 88,
       height: 88,
       borderRadius: 44,
       marginBottom: 10,
-      borderWidth: 1,
-      borderColor: '#000',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    profileAvatarFallback: {
       width: 88,
       height: 88,
       borderRadius: 44,
       marginBottom: 10,
-      borderWidth: 1,
-      borderColor: '#000',
-      backgroundColor: '#f3f3f3',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      backgroundColor: retroPalette.lilac,
       alignItems: 'center',
       justifyContent: 'center',
    },
    profileAvatarFallbackText: {
       fontSize: 26,
       fontWeight: '700',
-      color: '#333',
+      color: retroPalette.warmSand,
       fontFamily: baseMono,
    },
    profileName: {
       fontSize: 20,
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.outline,
       textAlign: 'center',
       textTransform: 'uppercase',
-      fontFamily: baseMono,
+      fontFamily: retroFonts.heading,
    },
    profileHeadline: {
       fontSize: 14,
-      color: '#666',
+      color: retroPalette.violet,
       marginTop: 4,
       textAlign: 'center',
       fontFamily: baseMono,
@@ -663,7 +764,7 @@ const styles = StyleSheet.create({
    },
    linkedinLink: {
       fontSize: 13,
-      color: '#0077b5',
+      color: retroPalette.teal,
       textAlign: 'center',
       textDecorationLine: 'underline',
       fontFamily: baseMono,
@@ -681,7 +782,7 @@ const styles = StyleSheet.create({
    },
    entryHighlight: {
       borderLeftWidth: 3,
-      borderLeftColor: '#f2c94c',
+      borderLeftColor: retroPalette.coral,
       paddingLeft: 12,
    },
    entryTimestampWrapper: {
@@ -692,11 +793,11 @@ const styles = StyleSheet.create({
    entryDivider: {
       flex: 1,
       height: 1,
-      backgroundColor: '#ececec',
+      backgroundColor: '#f4c9c9',
    },
    ts: {
       fontSize: 12,
-      color: '#888',
+      color: retroPalette.plum,
       marginHorizontal: 12,
       fontFamily: baseMono,
    },
@@ -704,9 +805,9 @@ const styles = StyleSheet.create({
       paddingVertical: 10,
       paddingHorizontal: 14,
       borderRadius: 18,
-      backgroundColor: '#f3f4f6',
-      borderWidth: 1,
-      borderColor: '#e5e5e5',
+      backgroundColor: '#fff5dd',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
       marginBottom: 10,
       maxWidth: '90%',
    },
@@ -715,98 +816,102 @@ const styles = StyleSheet.create({
    },
    msgBubbleSelf: {
       alignSelf: 'flex-end',
-      backgroundColor: '#e3f1ff',
-      borderColor: '#c5dfff',
+      backgroundColor: '#f8def5',
+      borderColor: retroPalette.violet,
    },
    msgBubbleHighlight: {
-      borderColor: '#f2c94c',
-      backgroundColor: '#fffbe6',
+      borderColor: retroPalette.yellow,
+      backgroundColor: '#fffad3',
    },
    msgSpeaker: {
       fontSize: 12,
-      color: '#666',
+      color: retroPalette.plum,
       marginBottom: 2,
       fontFamily: baseMono,
    },
    msgSpeakerSelf: {
-      color: '#1a73e8',
+      color: retroPalette.violet,
       textAlign: 'right',
    },
    msgText: {
       fontSize: 15,
-      color: '#111',
+      color: retroPalette.plum,
       fontFamily: baseMono,
       lineHeight: 20,
    },
-   error: { color: '#a00', padding: 16 },
+   error: { color: retroPalette.coral, padding: 16, fontFamily: baseMono },
    assistantErrorMessage: {
-      color: '#c00',
+      color: retroPalette.coral,
       marginBottom: 8,
       fontSize: 14,
       fontFamily: baseMono,
    },
    assistantBlock: {
       marginBottom: 16,
-      borderWidth: 1,
-      borderColor: '#e0e0e0',
-      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: retroPalette.violet,
+      borderRadius: 16,
       padding: 12,
-      backgroundColor: '#fafafa',
+      backgroundColor: '#fbe9ff',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
    },
    assistantLabel: {
       fontSize: 13,
       fontWeight: '600',
-      color: '#666',
+      color: retroPalette.plum,
       marginBottom: 2,
       fontFamily: baseMono,
    },
    assistantQuestion: {
       fontSize: 15,
-      color: '#000',
+      color: retroPalette.plum,
       marginBottom: 8,
       fontFamily: baseMono,
    },
    assistantAnswer: {
       fontSize: 15,
-      color: '#111',
+      color: retroPalette.violet,
       fontStyle: 'italic',
       marginBottom: 6,
       fontFamily: baseMono,
    },
    assistantSuggestion: {
       fontSize: 14,
-      color: '#555',
+      color: retroPalette.plum,
       marginBottom: 8,
       fontFamily: baseMono,
    },
    assistantExcerpt: {
       borderRadius: 10,
-      borderWidth: 1,
-      borderColor: '#e5e5e5',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
       padding: 8,
-      backgroundColor: '#fff',
+      backgroundColor: '#fffbe2',
       marginBottom: 8,
    },
    assistantExcerptLine: {
       fontSize: 14,
-      color: '#111',
+      color: retroPalette.plum,
       marginBottom: 4,
       fontFamily: baseMono,
    },
    assistantExcerptHighlight: {
-      backgroundColor: '#fff6cc',
+      backgroundColor: '#ffeaa0',
       borderRadius: 4,
       paddingHorizontal: 4,
       paddingVertical: 2,
    },
    assistantExcerptSpeaker: {
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.violet,
       fontFamily: baseMono,
    },
    assistantPlaceholder: {
       fontSize: 14,
-      color: '#666',
+      color: retroPalette.plum,
       marginTop: 20,
       fontFamily: baseMono,
    },
@@ -819,24 +924,21 @@ const styles = StyleSheet.create({
       paddingBottom: Platform.OS === 'ios' ? 32 : 20,
    },
    assistantTrigger: {
-      borderWidth: 1,
-      borderColor: '#d9d9d9',
-      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 22,
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor:
-         Platform.OS === 'ios'
-            ? 'rgba(255,255,255,0.92)'
-            : 'rgba(255,255,255,0.97)',
-      shadowColor: '#000',
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
+      backgroundColor: '#f9d9ff',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
       shadowOffset: { width: 0, height: 4 },
-      elevation: 6,
+      elevation: 5,
    },
    assistantTriggerText: {
       fontSize: 16,
-      color: '#333',
+      color: retroPalette.plum,
       fontFamily: baseMono,
    },
    modalOverlay: {
@@ -857,9 +959,11 @@ const styles = StyleSheet.create({
    },
    modalCard: {
       marginTop: 80,
-      backgroundColor: '#fff',
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      backgroundColor: retroPalette.warmSand,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
       paddingBottom: Platform.OS === 'ios' ? 30 : 20,
       overflow: 'hidden',
    },
@@ -870,11 +974,14 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      backgroundColor: retroPalette.menuGray,
+      borderBottomWidth: 2,
+      borderBottomColor: retroPalette.outline,
    },
    modalTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.menuText,
       fontFamily: baseMono,
    },
    modalClose: {
@@ -882,7 +989,7 @@ const styles = StyleSheet.create({
    },
    modalCloseText: {
       fontSize: 18,
-      color: '#000',
+      color: retroPalette.menuText,
       fontWeight: '700',
    },
    modalError: {
@@ -899,25 +1006,22 @@ const styles = StyleSheet.create({
    modalComposer: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      borderWidth: 1,
-      borderColor: '#d9d9d9',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
       borderRadius: 18,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      backgroundColor:
-         Platform.OS === 'ios'
-            ? 'rgba(255,255,255,0.95)'
-            : 'rgba(255,255,255,0.98)',
-      shadowColor: '#000',
-      shadowOpacity: 0.12,
-      shadowRadius: 12,
+      backgroundColor: '#fff0f5',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
       shadowOffset: { width: 0, height: 4 },
       elevation: 6,
    },
    modalInput: {
       flex: 1,
       fontSize: 16,
-      color: '#000',
+      color: retroPalette.plum,
       fontFamily: baseMono,
       paddingVertical: Platform.OS === 'ios' ? 10 : 6,
       paddingRight: 8,
@@ -926,32 +1030,32 @@ const styles = StyleSheet.create({
    modalSendButton: {
       minWidth: 56,
       height: 40,
-      borderWidth: 1,
-      borderColor: '#000',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: retroPalette.violet,
    },
    modalSendText: {
       fontSize: 15,
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.warmSand,
       fontFamily: baseMono,
    },
    modalAskAgainButton: {
-      borderWidth: 1,
-      borderColor: '#d0d0d0',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
       borderRadius: 14,
       paddingVertical: 10,
       paddingHorizontal: 16,
       alignSelf: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: '#ffe6f0',
    },
    modalAskAgainText: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#000',
+      color: retroPalette.plum,
       fontFamily: baseMono,
    },
    assistantButtonDisabled: {
@@ -962,9 +1066,9 @@ const styles = StyleSheet.create({
       paddingVertical: 4,
    },
    assistantLinkText: {
-      color: '#1a73e8',
+      color: retroPalette.teal,
       fontSize: 14,
       fontWeight: '600',
       fontFamily: baseMono,
    },
-})
+});
