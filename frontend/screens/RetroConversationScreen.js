@@ -395,6 +395,25 @@ export default function RetroConversationScreen({
                                  {displayHeadline}
                               </Text>
                            ) : null}
+                           {linkedinUrl ? (
+                              <TouchableOpacity
+                                 onPress={() => Linking.openURL(linkedinUrl)}
+                                 style={styles.linkedinRow}
+                                 activeOpacity={0.8}
+                              >
+                                 <View style={styles.linkedinIcon}>
+                                    <Text style={styles.linkedinIconText}>
+                                       in
+                                    </Text>
+                                 </View>
+                                 <Text
+                                    style={styles.linkedinUrl}
+                                    numberOfLines={1}
+                                 >
+                                    {linkedinUrl}
+                                 </Text>
+                              </TouchableOpacity>
+                           ) : null}
                         </View>
                      </View>
 
@@ -445,30 +464,6 @@ export default function RetroConversationScreen({
                         </>
                      )}
 
-                     {linkedinUrl ? (
-                        <TouchableOpacity
-                           onPress={() => Linking.openURL(linkedinUrl)}
-                           style={styles.linkedinLinkWrapper}
-                        >
-                           <Text style={styles.linkedinLink}>
-                              View LinkedIn Profile
-                           </Text>
-                        </TouchableOpacity>
-                     ) : null}
-                     {linkedinUrl ? (
-                        <TouchableOpacity
-                           onPress={() => Linking.openURL(linkedinUrl)}
-                           style={styles.linkedinRow}
-                           activeOpacity={0.8}
-                        >
-                           <View style={styles.linkedinIcon}>
-                              <Text style={styles.linkedinIconText}>in</Text>
-                           </View>
-                           <Text style={styles.linkedinUrl} numberOfLines={1}>
-                              {linkedinUrl}
-                           </Text>
-                        </TouchableOpacity>
-                     ) : null}
                   </View>
                </View>
             </LinearGradient>
