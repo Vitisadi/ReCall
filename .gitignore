@@ -6,6 +6,7 @@ backend/faces_db/*
 backend/faces_db/embeddings.json
 backend/conversations/*
 backend/uploads/*
+backend/highlights.json
 
 # ---------------------------
 # Global Python (Flask frontend)

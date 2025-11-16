@@ -14,6 +14,10 @@ from analyzers.enroll_face import enroll
 # from analyzers.transcript_analyzer import whisper_model
 from analyzers.face_analyzer import face_app
 from services.linkedin_enricher import enrich_linkedin_profile
+from services.highlights import (
+    detect_and_store_highlights,
+    get_upcoming_highlights,
+)
 from google import genai
 
 print("✅ All AI models preloaded (Whisper + InsightFace). Ready to process requests.")
@@ -112,12 +116,28 @@ def assistant_people():
     question = (payload.get("question") or "").strip()
     if not question:
         return jsonify({"error": "Please provide a question for the assistant."}), 400
+    target_name = (
+        payload.get("name")
+        or payload.get("person")
+        or payload.get("person_key")
+        or ""
+    ).strip()
+    normalized_target = target_name.lower() if target_name else None
 
-    matches = find_relevant_people(question)
+    matches = find_relevant_people(question, normalized_target)
+    if normalized_target:
+        matches = [
+            match for match in matches if match.get("name", "").lower() == normalized_target
+        ]
     if not matches:
+        no_data_msg = (
+            f"I could not find any saved conversations for {target_name}."
+            if normalized_target
+            else "I could not find any saved conversations yet."
+        )
         return jsonify({
             "question": question,
-            "answer": "I could not find any saved conversations yet.",
+            "answer": no_data_msg,
             "matches": []
         })
 
@@ -169,6 +189,13 @@ def get_conversation(name):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     return jsonify({"name": name, "conversation": data})
+
+
+@app.route("/api/highlights", methods=["GET"])
+def list_highlights():
+    """Return upcoming highlight reminders detected from transcripts."""
+    highlights = get_upcoming_highlights()
+    return jsonify({"highlights": highlights})
 
 # process uploaded video
 """
@@ -322,6 +349,21 @@ def save_conversation(data):
     existing.append(entry)
     path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     print(f"💾 Conversation history updated for: {name}")
+
+    try:
+        highlights_created = detect_and_store_highlights(
+            person_name=name,
+            conversation=entry.get("conversation", []),
+            conversation_timestamp=entry.get("timestamp", int(time.time())),
+            gemini_client=gemini_client,
+            headline=entry.get("headline"),
+        )
+        if highlights_created:
+            print(
+                f"⭐ Added {len(highlights_created)} highlight(s) for {name}."
+            )
+    except Exception as exc:
+        print(f"⚠️ Failed to record highlights for {name}: {exc}")
 
 def enrich_latest_linkedin(name, force=False):
     """Fetch or update LinkedIn info for the most recent conversation entry."""
@@ -547,14 +589,20 @@ def build_contextual_excerpt(match, ai_excerpt, window=1):
     match["highlight_indices"] = sorted(highlight_indices)
     return excerpt
 
-def find_relevant_people(question):
-    """Search every saved conversation for the entry that best answers the question."""
+def find_relevant_people(question, target_name=None):
+    """Search saved conversations for entries that best answer the question.
+
+    If target_name is provided, limit the search to that person only.
+    """
     tokens = _tokenize_text(question)
     assets = _collect_person_assets()
     matches = []
+    normalized_target = target_name.lower() if target_name else None
 
     for conv_file in MEMORY_DIR.glob("*.json"):
         name = conv_file.stem
+        if normalized_target and name.lower() != normalized_target:
+            continue
         try:
             entries = json.loads(conv_file.read_text(encoding="utf-8"))
         except Exception:

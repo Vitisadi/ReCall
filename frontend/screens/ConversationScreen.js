@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
    View,
    Text,
@@ -9,6 +9,11 @@ import {
    Platform,
    Image,
    Linking,
+   TextInput,
+   KeyboardAvoidingView,
+   Modal,
+   ScrollView,
+   Keyboard,
 } from 'react-native';
 import axios from 'axios';
 import { BASE_URL } from '../config';
@@ -26,9 +31,47 @@ export default function ConversationScreen({
    const [data, setData] = useState([]);
    const [conversationHeadline, setConversationHeadline] = useState('');
    const [linkedinUrl, setLinkedinUrl] = useState('');
+   const [personAssistantInput, setPersonAssistantInput] = useState('');
+   const [personAssistantLoading, setPersonAssistantLoading] = useState(false);
+   const [personAssistantError, setPersonAssistantError] = useState('');
+   const [personAssistantResult, setPersonAssistantResult] = useState(null);
+   const [personAssistantModalVisible, setPersonAssistantModalVisible] =
+      useState(false);
+   const [isModalComposerActive, setIsModalComposerActive] = useState(false);
+   const [activeHighlight, setActiveHighlight] = useState({
+      timestamp: highlightTimestamp || null,
+      index: Number.isInteger(highlightIndex) ? highlightIndex : -1,
+      indices: [],
+   });
    const listRef = useRef(null);
+   const assistantInputRef = useRef(null);
+
+   useEffect(() => {
+      setActiveHighlight({
+         timestamp: highlightTimestamp || null,
+         index: Number.isInteger(highlightIndex) ? highlightIndex : -1,
+         indices: [],
+      });
+   }, [highlightTimestamp, highlightIndex]);
+
+   useEffect(() => {
+      if (!personAssistantModalVisible || !isModalComposerActive) return;
+      const timer = setTimeout(() => {
+         assistantInputRef.current?.focus();
+      }, 220);
+      return () => clearTimeout(timer);
+   }, [personAssistantModalVisible, isModalComposerActive]);
 
    const displayHeadline = profileHeadline || conversationHeadline;
+   const displayPersonName = useMemo(() => {
+      if (!name) return '';
+      return name
+         .split(' ')
+         .filter(Boolean)
+         .map((part) => part[0].toUpperCase() + part.slice(1))
+         .join(' ');
+   }, [name]);
+   const assistantDisplayName = displayPersonName || name;
    const initials = name
       ? name
            .split(' ')
@@ -77,9 +120,9 @@ export default function ConversationScreen({
    }, [name]);
 
    const scrollToHighlight = useCallback(() => {
-      if (!highlightTimestamp || !data.length || !listRef.current) return;
+      if (!activeHighlight.timestamp || !data.length || !listRef.current) return;
       const entryIndex = data.findIndex(
-         (entry) => entry.timestamp === highlightTimestamp
+         (entry) => entry.timestamp === activeHighlight.timestamp
       );
       if (entryIndex < 0) return;
 
@@ -89,11 +132,51 @@ export default function ConversationScreen({
             animated: true,
          });
       });
-   }, [data, highlightTimestamp]);
+   }, [data, activeHighlight.timestamp]);
 
    useEffect(() => {
       scrollToHighlight();
    }, [scrollToHighlight]);
+
+   useEffect(() => {
+      if (activeHighlight.timestamp || !data.length || !listRef.current) {
+         return;
+      }
+      ensureScrolledToEnd();
+   }, [data, activeHighlight.timestamp, ensureScrolledToEnd]);
+
+   const applyMatchHighlight = useCallback((match) => {
+      if (!match || !match.timestamp) return;
+      setActiveHighlight({
+         timestamp: match.timestamp,
+         index: Number.isInteger(match.highlight_index)
+            ? match.highlight_index
+            : -1,
+         indices: Array.isArray(match.highlight_indices)
+            ? match.highlight_indices
+            : [],
+      });
+   }, []);
+
+   const ensureScrolledToEnd = useCallback(() => {
+      if (activeHighlight.timestamp || !listRef.current) return;
+      requestAnimationFrame(() => {
+         listRef.current?.scrollToEnd?.({ animated: false });
+      });
+   }, [activeHighlight.timestamp]);
+
+   const closeAssistantModal = useCallback(() => {
+      setPersonAssistantModalVisible(false);
+      setIsModalComposerActive(false);
+      Keyboard.dismiss();
+   }, []);
+
+   const openAssistantModal = useCallback(() => {
+      setPersonAssistantError('');
+      setPersonAssistantInput('');
+      setIsModalComposerActive(!personAssistantResult);
+      setPersonAssistantModalVisible(true);
+   }, [personAssistantResult]);
 
    const renderEntry = ({ item }) => {
       // item is expected to be { timestamp, conversation }
@@ -101,13 +184,26 @@ export default function ConversationScreen({
          ? new Date(item.timestamp * 1000).toLocaleString()
          : '';
       const isHighlightedEntry =
-         Boolean(highlightTimestamp) && item.timestamp === highlightTimestamp;
-      const highlightSet =
-         isHighlightedEntry && Array.isArray(item.highlight_indices)
-            ? new Set(item.highlight_indices)
-            : isHighlightedEntry && Number.isInteger(highlightIndex)
-            ? new Set([highlightIndex])
-            : new Set();
+         Boolean(activeHighlight.timestamp) &&
+         item.timestamp === activeHighlight.timestamp;
+      const highlightSet = (() => {
+         if (!isHighlightedEntry) {
+            return new Set();
+         }
+         if (Array.isArray(item.highlight_indices) && item.highlight_indices.length) {
+            return new Set(item.highlight_indices);
+         }
+         if (
+            Array.isArray(activeHighlight.indices) &&
+            activeHighlight.indices.length
+         ) {
+            return new Set(activeHighlight.indices);
+         }
+         if (Number.isInteger(activeHighlight.index)) {
+            return new Set([activeHighlight.index]);
+         }
+         return new Set();
+      })();
 
       return (
          <View
@@ -120,82 +216,191 @@ export default function ConversationScreen({
                   <View style={styles.entryDivider} />
                </View>
             ) : null}
-            {Array.isArray(item.conversation)
-               ? item.conversation.map((m, i) => {
-                    const isObject = m && typeof m === 'object';
-                    const speaker = isObject && m.speaker ? m.speaker : '';
-                    const text = isObject
-                       ? m.text != null
-                          ? m.text
-                          : JSON.stringify(m)
-                       : typeof m === 'string'
-                       ? m
-                       : String(m ?? '');
-                    const isSelf = speaker
-                       ? /you|me|self/i.test(speaker)
-                       : false;
+            {Array.isArray(item.conversation) ? (
+               item.conversation.map((m, i) => {
+                  const isObject = m && typeof m === 'object';
+                  const speaker = isObject && m.speaker ? m.speaker : '';
+                  const text = isObject
+                     ? m.text != null
+                        ? m.text
+                        : JSON.stringify(m)
+                     : typeof m === 'string'
+                     ? m
+                     : String(m ?? '');
+                  const isSelf = speaker ? /you|me|self/i.test(speaker) : false;
 
-                    return (
-                       <View
-                          key={i}
-                          style={[
-                             styles.msgBubble,
-                             isSelf
-                                ? styles.msgBubbleSelf
-                                : styles.msgBubblePeer,
-                             isHighlightedEntry &&
-                                highlightSet.has(i) &&
-                                styles.msgBubbleHighlight,
-                          ]}
-                       >
-                          {speaker ? (
-                             <Text
-                                style={[
-                                   styles.msgSpeaker,
-                                   isSelf && styles.msgSpeakerSelf,
-                                ]}
-                             >
-                                {speaker}
-                             </Text>
-                          ) : null}
-                          <Text style={styles.msgText}>{text}</Text>
-                       </View>
-                    );
-                 })
-               : (
-                    <View
-                       style={[
-                          styles.msgBubble,
-                          styles.msgBubblePeer,
-                          isHighlightedEntry && styles.msgBubbleHighlight,
-                       ]}
-                    >
-                       <Text style={styles.msgText}>
-                          {JSON.stringify(item.conversation)}
-                       </Text>
-                    </View>
-                 )}
+                  return (
+                     <View
+                        key={i}
+                        style={[
+                           styles.msgBubble,
+                           isSelf ? styles.msgBubbleSelf : styles.msgBubblePeer,
+                           isHighlightedEntry &&
+                              highlightSet.has(i) &&
+                              styles.msgBubbleHighlight,
+                        ]}
+                     >
+                        {speaker ? (
+                           <Text
+                              style={[
+                                 styles.msgSpeaker,
+                                 isSelf && styles.msgSpeakerSelf,
+                              ]}
+                           >
+                              {speaker}
+                           </Text>
+                        ) : null}
+                        <Text style={styles.msgText}>{text}</Text>
+                     </View>
+                  );
+               })
+            ) : (
+               <View
+                  style={[
+                     styles.msgBubble,
+                     styles.msgBubblePeer,
+                     isHighlightedEntry && styles.msgBubbleHighlight,
+                  ]}
+               >
+                  <Text style={styles.msgText}>
+                     {JSON.stringify(item.conversation)}
+                  </Text>
+               </View>
+            )}
          </View>
       );
    };
 
+   const handleAskPerson = async () => {
+      const question = personAssistantInput.trim();
+      if (!question || personAssistantLoading) return;
+
+      setPersonAssistantLoading(true);
+      setPersonAssistantError('');
+      setIsModalComposerActive(false);
+      Keyboard.dismiss();
+      try {
+         const res = await axios.post(`${BASE_URL}/api/people/assistant`, {
+            question,
+            name,
+            person: name,
+            person_key: (name || '').trim().toLowerCase(),
+         });
+         const payload = res.data || {};
+         const normalizedTarget = (name || '').trim().toLowerCase();
+         const normalizedMatch =
+            (payload.match?.name || '').toString().trim().toLowerCase();
+         if (
+            normalizedTarget &&
+            normalizedMatch &&
+            normalizedTarget !== normalizedMatch
+         ) {
+            setPersonAssistantResult(null);
+            setPersonAssistantError(
+               `This memory only contains info about ${assistantDisplayName}.`
+            );
+            return;
+         }
+         setPersonAssistantResult({
+            id: Date.now().toString(),
+            question: payload.question || question,
+            answer: payload.answer,
+            suggestion: payload.suggestion,
+            match: payload.match,
+         });
+         setPersonAssistantInput('');
+         if (payload.match) {
+            applyMatchHighlight(payload.match);
+         }
+      } catch (error) {
+         console.error(
+            'Person assistant error:',
+            error?.response?.data || error.message
+         );
+         const message =
+            error?.response?.data?.error ||
+            `Something went wrong asking about ${name}. Please try again.`;
+         setPersonAssistantError(message);
+      } finally {
+         setPersonAssistantLoading(false);
+      }
+   };
+
    return (
-      <View style={styles.container}>
-         <View style={styles.header}>
-            <TouchableOpacity
-               onPress={onBack}
-               style={styles.backBtn}
-               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-               <Text style={styles.backText}>←</Text>
-            </TouchableOpacity>
-            <View style={styles.profileBubble}>
-               {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.profileAvatar} />
-               ) : (
-                  <View style={styles.profileAvatarFallback}>
-                     <Text style={styles.profileAvatarFallbackText}>{initials}</Text>
+      <>
+         <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+         >
+            <View style={styles.container}>
+               <View style={styles.header}>
+                  <TouchableOpacity
+                     onPress={onBack}
+                     style={styles.backBtn}
+                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                     <Text style={styles.backText}>←</Text>
+                  </TouchableOpacity>
+                  <View style={styles.profileBubble}>
+                     {avatarUrl ? (
+                        <Image
+                           source={{ uri: avatarUrl }}
+                           style={styles.profileAvatar}
+                        />
+                     ) : (
+                        <View style={styles.profileAvatarFallback}>
+                           <Text style={styles.profileAvatarFallbackText}>
+                              {initials}
+                           </Text>
+                        </View>
+                     )}
+                     <Text style={styles.profileName}>{name}</Text>
+                     {displayHeadline ? (
+                        <Text style={styles.profileHeadline}>{displayHeadline}</Text>
+                     ) : null}
                   </View>
+               </View>
+
+               {loading && (
+                  <ActivityIndicator size='large' style={{ marginTop: 20 }} />
+               )}
+               {error && <Text style={styles.error}>{error}</Text>}
+
+               {!loading && !error && (
+                  <>
+                     <FlatList
+                        ref={listRef}
+                        data={data}
+                        keyExtractor={(item, idx) => String(item.timestamp || idx)}
+                        renderItem={renderEntry}
+                        style={styles.list}
+                        contentContainerStyle={styles.listContent}
+                        keyboardShouldPersistTaps='handled'
+                        onContentSizeChange={ensureScrolledToEnd}
+                        onScrollToIndexFailed={({ index }) => {
+                           setTimeout(() => {
+                              listRef.current?.scrollToIndex({
+                                 index,
+                                 animated: true,
+                              });
+                           }, 200);
+                        }}
+                     />
+                     <View style={styles.assistantTriggerShell}>
+                        <TouchableOpacity
+                           style={styles.assistantTrigger}
+                           activeOpacity={0.9}
+                           onPress={openAssistantModal}
+                        >
+                           <Text style={styles.assistantTriggerText}>
+                              {personAssistantResult?.question
+                                 ? `You: ${personAssistantResult.question}`
+                                 : `Ask about ${assistantDisplayName}`}
+                           </Text>
+                        </TouchableOpacity>
+                     </View>
+                  </>
                )}
                <Text style={styles.profileName}>{name}</Text>
                {displayHeadline ? (
@@ -210,28 +415,156 @@ export default function ConversationScreen({
                   </TouchableOpacity>
                ) : null}
             </View>
-         </View>
+         </KeyboardAvoidingView>
 
-         {loading && (
-            <ActivityIndicator size='large' style={{ marginTop: 20 }} />
-         )}
-         {error && <Text style={styles.error}>{error}</Text>}
-
-         {!loading && !error && (
-            <FlatList
-               ref={listRef}
-               data={data}
-               keyExtractor={(item, idx) => String(item.timestamp || idx)}
-               renderItem={renderEntry}
-               contentContainerStyle={styles.listContent}
-               onScrollToIndexFailed={({ index }) => {
-                  setTimeout(() => {
-                     listRef.current?.scrollToIndex({ index, animated: true });
-                  }, 200);
-               }}
-            />
-         )}
-      </View>
+         <Modal
+            visible={personAssistantModalVisible}
+            transparent
+            animationType='fade'
+            onRequestClose={closeAssistantModal}
+         >
+            <View style={styles.modalOverlay}>
+               <TouchableOpacity
+                  style={styles.modalBackdrop}
+                  activeOpacity={1}
+                  onPress={closeAssistantModal}
+               />
+               <KeyboardAvoidingView
+                  behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                  style={styles.modalCardWrapper}
+               >
+                  <View style={styles.modalCard}>
+                     <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>
+                           Ask About {assistantDisplayName}
+                        </Text>
+                        <TouchableOpacity
+                           onPress={closeAssistantModal}
+                           style={styles.modalClose}
+                        >
+                           <Text style={styles.modalCloseText}>✕</Text>
+                        </TouchableOpacity>
+                     </View>
+                     {personAssistantError ? (
+                        <Text
+                           style={[styles.assistantErrorMessage, styles.modalError]}
+                        >
+                           {personAssistantError}
+                        </Text>
+                     ) : null}
+                     <ScrollView
+                        style={styles.modalContent}
+                        contentContainerStyle={{ paddingBottom: 160 }}
+                        keyboardShouldPersistTaps='handled'
+                     >
+                        {personAssistantResult ? (
+                           <View style={styles.assistantBlock}>
+                              <Text style={styles.assistantLabel}>You</Text>
+                              <Text style={styles.assistantQuestion}>
+                                 {personAssistantResult.question}
+                              </Text>
+                              <Text style={styles.assistantLabel}>Assistant</Text>
+                              {personAssistantResult.answer ? (
+                                 <Text style={styles.assistantAnswer}>
+                                    {personAssistantResult.answer}
+                                 </Text>
+                              ) : null}
+                              {personAssistantResult.suggestion ? (
+                                 <Text style={styles.assistantSuggestion}>
+                                    {personAssistantResult.suggestion}
+                                 </Text>
+                              ) : null}
+                              {Array.isArray(personAssistantResult.match?.excerpt) &&
+                              personAssistantResult.match.excerpt.length > 0 ? (
+                                 <View style={styles.assistantExcerpt}>
+                                    {personAssistantResult.match.excerpt.map(
+                                       (turn, idx) => (
+                                          <Text
+                                             key={`${personAssistantResult.id}-excerpt-${idx}`}
+                                             style={[
+                                                styles.assistantExcerptLine,
+                                                turn.is_highlight &&
+                                                   styles.assistantExcerptHighlight,
+                                             ]}
+                                          >
+                                             <Text
+                                                style={styles.assistantExcerptSpeaker}
+                                             >
+                                                {turn.speaker}:{' '}
+                                             </Text>
+                                             {turn.text}
+                                          </Text>
+                                       )
+                                    )}
+                                 </View>
+                              ) : null}
+                              {personAssistantResult.match?.timestamp ? (
+                                 <TouchableOpacity
+                                    onPress={() => {
+                                       applyMatchHighlight(personAssistantResult.match);
+                                       closeAssistantModal();
+                                    }}
+                                    style={styles.assistantLink}
+                                 >
+                                    <Text style={styles.assistantLinkText}>
+                                       Jump to highlighted spot
+                                    </Text>
+                                 </TouchableOpacity>
+                              ) : null}
+                           </View>
+                        ) : (
+                           <Text style={styles.assistantPlaceholder}>
+                              Ask a question about {assistantDisplayName} to see AI
+                              answers here.
+                           </Text>
+                        )}
+                     </ScrollView>
+                     <View style={styles.modalComposerShell}>
+                        {isModalComposerActive ? (
+                           <View style={styles.modalComposer}>
+                              <TextInput
+                                 ref={assistantInputRef}
+                                 value={personAssistantInput}
+                                 onChangeText={setPersonAssistantInput}
+                                 style={styles.modalInput}
+                                 placeholder={`Ask something about ${assistantDisplayName}`}
+                                 placeholderTextColor='#999'
+                                 returnKeyType='send'
+                                 multiline
+                                 onSubmitEditing={handleAskPerson}
+                              />
+                              <TouchableOpacity
+                                 style={[
+                                    styles.modalSendButton,
+                                    personAssistantLoading &&
+                                       styles.assistantButtonDisabled,
+                                 ]}
+                                 onPress={handleAskPerson}
+                                 disabled={personAssistantLoading}
+                              >
+                                 {personAssistantLoading ? (
+                                    <ActivityIndicator size='small' color='#000' />
+                                 ) : (
+                                    <Text style={styles.modalSendText}>Send</Text>
+                                 )}
+                              </TouchableOpacity>
+                           </View>
+                        ) : (
+                           <TouchableOpacity
+                              style={styles.modalAskAgainButton}
+                              onPress={() => setIsModalComposerActive(true)}
+                           >
+                              <Text style={styles.modalAskAgainText}>
+                                 Ask another question
+                              </Text>
+                           </TouchableOpacity>
+                        )}
+                     </View>
+                  </View>
+               </KeyboardAvoidingView>
+            </View>
+         </Modal>
+      </>
    );
 }
 
@@ -245,22 +578,22 @@ const baseMono =
 const styles = StyleSheet.create({
    container: { flex: 1, backgroundColor: '#fff' },
    header: {
-      paddingTop: 24,
-      paddingBottom: 12,
-      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+      paddingHorizontal: 12,
       borderBottomWidth: 1,
       borderBottomColor: '#eee',
       backgroundColor: '#fff',
    },
    backBtn: {
-      width: 42,
-      height: 32,
+      width: 36,
+      height: 28,
       borderWidth: 1,
       borderColor: '#000',
       borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 16,
+      marginBottom: 10,
    },
    backText: {
       fontSize: 18,
@@ -271,14 +604,14 @@ const styles = StyleSheet.create({
    profileBubble: {
       borderWidth: 1,
       borderColor: '#000',
-      borderRadius: 24,
-      paddingVertical: 18,
-      paddingHorizontal: 20,
+      borderRadius: 20,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
       alignItems: 'center',
       backgroundColor: '#fff',
       alignSelf: 'center',
       width: '100%',
-      maxWidth: 360,
+      maxWidth: 340,
       shadowColor: '#000',
       shadowOpacity: 0.08,
       shadowRadius: 12,
@@ -286,18 +619,18 @@ const styles = StyleSheet.create({
       elevation: 4,
    },
    profileAvatar: {
-      width: 96,
-      height: 96,
-      borderRadius: 48,
-      marginBottom: 12,
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      marginBottom: 10,
       borderWidth: 1,
       borderColor: '#000',
    },
    profileAvatarFallback: {
-      width: 96,
-      height: 96,
-      borderRadius: 48,
-      marginBottom: 12,
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      marginBottom: 10,
       borderWidth: 1,
       borderColor: '#000',
       backgroundColor: '#f3f3f3',
@@ -311,7 +644,7 @@ const styles = StyleSheet.create({
       fontFamily: baseMono,
    },
    profileName: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: '700',
       color: '#000',
       textAlign: 'center',
@@ -335,13 +668,16 @@ const styles = StyleSheet.create({
       textDecorationLine: 'underline',
       fontFamily: baseMono,
    },
+   list: {
+      paddingBottom: Platform.OS === 'ios' ? 260 : 240,
+   },
    listContent: {
-      paddingHorizontal: 16,
-      paddingVertical: 20,
-      paddingBottom: 36,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      paddingBottom: 56,
    },
    entry: {
-      marginBottom: 18,
+      marginBottom: 14,
    },
    entryHighlight: {
       borderLeftWidth: 3,
@@ -403,4 +739,232 @@ const styles = StyleSheet.create({
       lineHeight: 20,
    },
    error: { color: '#a00', padding: 16 },
-});
+   assistantErrorMessage: {
+      color: '#c00',
+      marginBottom: 8,
+      fontSize: 14,
+      fontFamily: baseMono,
+   },
+   assistantBlock: {
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: '#e0e0e0',
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: '#fafafa',
+   },
+   assistantLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#666',
+      marginBottom: 2,
+      fontFamily: baseMono,
+   },
+   assistantQuestion: {
+      fontSize: 15,
+      color: '#000',
+      marginBottom: 8,
+      fontFamily: baseMono,
+   },
+   assistantAnswer: {
+      fontSize: 15,
+      color: '#111',
+      fontStyle: 'italic',
+      marginBottom: 6,
+      fontFamily: baseMono,
+   },
+   assistantSuggestion: {
+      fontSize: 14,
+      color: '#555',
+      marginBottom: 8,
+      fontFamily: baseMono,
+   },
+   assistantExcerpt: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#e5e5e5',
+      padding: 8,
+      backgroundColor: '#fff',
+      marginBottom: 8,
+   },
+   assistantExcerptLine: {
+      fontSize: 14,
+      color: '#111',
+      marginBottom: 4,
+      fontFamily: baseMono,
+   },
+   assistantExcerptHighlight: {
+      backgroundColor: '#fff6cc',
+      borderRadius: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+   },
+   assistantExcerptSpeaker: {
+      fontWeight: '700',
+      color: '#000',
+      fontFamily: baseMono,
+   },
+   assistantPlaceholder: {
+      fontSize: 14,
+      color: '#666',
+      marginTop: 20,
+      fontFamily: baseMono,
+   },
+   assistantTriggerShell: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      padding: 16,
+      paddingBottom: Platform.OS === 'ios' ? 32 : 20,
+   },
+   assistantTrigger: {
+      borderWidth: 1,
+      borderColor: '#d9d9d9',
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor:
+         Platform.OS === 'ios'
+            ? 'rgba(255,255,255,0.92)'
+            : 'rgba(255,255,255,0.97)',
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 6,
+   },
+   assistantTriggerText: {
+      fontSize: 16,
+      color: '#333',
+      fontFamily: baseMono,
+   },
+   modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+   },
+   modalBackdrop: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+   },
+   modalCardWrapper: {
+      flex: 1,
+      justifyContent: 'flex-end',
+   },
+   modalCard: {
+      marginTop: 80,
+      backgroundColor: '#fff',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+      overflow: 'hidden',
+   },
+   modalHeader: {
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+   },
+   modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#000',
+      fontFamily: baseMono,
+   },
+   modalClose: {
+      padding: 8,
+   },
+   modalCloseText: {
+      fontSize: 18,
+      color: '#000',
+      fontWeight: '700',
+   },
+   modalError: {
+      paddingHorizontal: 20,
+   },
+   modalContent: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+   },
+   modalComposerShell: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+   },
+   modalComposer: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      borderWidth: 1,
+      borderColor: '#d9d9d9',
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor:
+         Platform.OS === 'ios'
+            ? 'rgba(255,255,255,0.95)'
+            : 'rgba(255,255,255,0.98)',
+      shadowColor: '#000',
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 6,
+   },
+   modalInput: {
+      flex: 1,
+      fontSize: 16,
+      color: '#000',
+      fontFamily: baseMono,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+      paddingRight: 8,
+      minHeight: 60,
+   },
+   modalSendButton: {
+      minWidth: 56,
+      height: 40,
+      borderWidth: 1,
+      borderColor: '#000',
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#fff',
+   },
+   modalSendText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#000',
+      fontFamily: baseMono,
+   },
+   modalAskAgainButton: {
+      borderWidth: 1,
+      borderColor: '#d0d0d0',
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      alignSelf: 'center',
+      backgroundColor: '#fff',
+   },
+   modalAskAgainText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#000',
+      fontFamily: baseMono,
+   },
+   assistantButtonDisabled: {
+      opacity: 0.6,
+   },
+   assistantLink: {
+      alignSelf: 'flex-start',
+      paddingVertical: 4,
+   },
+   assistantLinkText: {
+      color: '#1a73e8',
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: baseMono,
+   },
+})
