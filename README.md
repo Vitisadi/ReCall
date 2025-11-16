@@ -18,7 +18,7 @@ ReCall is a lightweight memory assistant that turns raw conversations into somet
 cd backend
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env   # fill AWS/Gemini/BASE_URL
+cp .env.example .env   # then copy in your AWS/Gemini keys + BASE_URL (see below)
 python app.py
 
 # Frontend
@@ -27,6 +27,20 @@ npm install
 cp config.example.js config.js   # set BASE_URL to your backend
 npm run start                    # expo start
 ```
+
+### Environment keys
+
+Populate `backend/.env` with the same values used in development:
+
+```
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=
+GEMINI_API_KEY=
+BASE_URL=
+```
+
+The speech-to-text analyzer also expects `backend/analyzers/google_key.json` to contain the same Google Cloud service account JSON you used while building the project. Drop that JSON file in place before running `app.py`.
 
 Use Expo Go (or a simulator) to open the QR code shown in the terminal.
 
