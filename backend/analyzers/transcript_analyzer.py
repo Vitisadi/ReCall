@@ -269,16 +269,28 @@ def ask_gemini(sentences):
         contents=prompt
     )
 
-    text_output = response.text.strip()
-    
+    raw_output = (response.text or "").strip()
+    print("Gemini Raw Output:")
+    print(raw_output)
+
+    text_output = raw_output
     # Remove markdown code blocks if present
     if text_output.startswith("```"):
         lines = text_output.split("\n")
         text_output = "\n".join(lines[1:-1])  # Remove first and last lines
         if text_output.startswith("json"):
             text_output = text_output[4:].strip()
-    
-    return json.loads(text_output)
+
+    # try:
+    parsed = json.loads(text_output)
+    # except Exception as e:
+    #     # print("⚠️ Failed to parse Gemini output:", e)
+    #     # print("Raw output was:\n", text_output)
+    #     raise
+
+    # print("Gemini Parsed JSON:")
+    # print(json.dumps(parsed, indent=2))
+    return parsed
 
 # ============================================================
 # MAIN PIPELINE

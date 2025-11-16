@@ -13,11 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { BASE_URL } from '../config';
-import {
-   retroFonts,
-   retroPalette,
-   retroMenuItems,
-} from '../styles/retroTheme';
+import { retroFonts, retroPalette, retroMenuItems } from '../styles/retroTheme';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -46,10 +42,37 @@ const createSeededRandom = (seedStr) => {
    };
 };
 
-export default function HomeScreen({ onOpenConversation }) {
+const formatCountdown = (timestamp, eventDate) => {
+   if (!timestamp) return null;
+   const now = Date.now();
+   const target = timestamp * 1000 || Date.parse(eventDate || '');
+   if (!target || Number.isNaN(target)) return null;
+   const diff = target - now;
+   if (diff <= 0) return 'Today';
+   const days = Math.floor(diff / 86400000);
+   if (days === 0) {
+      const hours = Math.ceil(diff / 3600000);
+      return hours <= 1 ? 'In <1 hour' : `In ${hours} hours`;
+   }
+   if (days === 1) return 'Tomorrow';
+   return `In ${days} days`;
+};
+
+const formatEventDate = (eventDate) => {
+   if (!eventDate) return 'Upcoming';
+   return new Date(eventDate).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+   });
+};
+
+export default function HomeScreen({ onOpenConversation, onNavigateTab }) {
    const [nodes, setNodes] = useState([]);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState('');
+   const [highlightsPreview, setHighlightsPreview] = useState([]);
+   const [highlightsError, setHighlightsError] = useState('');
+   const [highlightsLoading, setHighlightsLoading] = useState(true);
    const { width } = useWindowDimensions();
    const graphHeight = Math.max(420, width * 0.9);
 
@@ -115,6 +138,32 @@ export default function HomeScreen({ onOpenConversation }) {
       };
    }, []);
 
+   useEffect(() => {
+      let active = true;
+      const fetchHighlightsPreview = async () => {
+         try {
+            setHighlightsLoading(true);
+            setHighlightsError('');
+            const res = await axios.get(`${BASE_URL}/api/highlights`);
+            if (!active) return;
+            const list = res.data?.highlights || [];
+            setHighlightsPreview(list.slice(0, 3));
+         } catch (err) {
+            if (!active) return;
+            setHighlightsError('Highlights are currently unavailable.');
+         } finally {
+            if (active) {
+               setHighlightsLoading(false);
+            }
+         }
+      };
+
+      fetchHighlightsPreview();
+      return () => {
+         active = false;
+      };
+   }, []);
+
    const preparedNodes = useMemo(() => {
       if (!nodes.length) return [];
       const sorted = [...nodes].sort(
@@ -125,10 +174,11 @@ export default function HomeScreen({ onOpenConversation }) {
          (sum, person) => sum + (person.conversationWeight || 0),
          0
       );
-      const baseSize = 70;
-      const maxSize = Math.min(150, width * 0.35);
+      const baseSize = Math.max(48, width * 0.12);
+      const maxSize = Math.min(120, width * 0.28);
       const placedNodes = [];
-      const spacingPadding = Math.max(18, Math.min(width, graphHeight) * 0.04);
+      const spacingPadding = Math.max(36, Math.min(width, graphHeight) * 0.08);
+      const labelBuffer = 52;
 
       return sorted.map((node, index) => {
          const weight = node.conversationWeight || 0;
@@ -137,7 +187,10 @@ export default function HomeScreen({ onOpenConversation }) {
                ? baseSize
                : baseSize +
                  ((maxSize - baseSize) * weight) / Math.max(maxWeight, 1);
-         const radiusLimit = Math.min(width, graphHeight) / 2 - size / 2 - 16;
+         const radiusLimit = Math.max(
+            0,
+            Math.min(width, graphHeight) / 2 - size / 2 - spacingPadding
+         );
          const ratio =
             sorted.length === 1
                ? 0
@@ -167,7 +220,10 @@ export default function HomeScreen({ onOpenConversation }) {
          const minX = spacingPadding + size / 2;
          const maxX = Math.max(minX, width - spacingPadding - size / 2);
          const minY = spacingPadding + size / 2;
-         const maxY = Math.max(minY, graphHeight - spacingPadding - size / 2);
+         const maxY = Math.max(
+            minY,
+            graphHeight - spacingPadding - size / 2 - labelBuffer
+         );
          const availableWidth = Math.max(0, maxX - minX);
          const availableHeight = Math.max(0, maxY - minY);
 
@@ -182,8 +238,7 @@ export default function HomeScreen({ onOpenConversation }) {
                const dx = candidateX - other.x;
                const dy = candidateY - other.y;
                const distance = Math.sqrt(dx * dx + dy * dy);
-               const minDistance =
-                  (size + other.size) / 2 + spacingPadding;
+               const minDistance = (size + other.size) / 2 + spacingPadding;
                return distance < minDistance;
             });
             if (!overlaps) {
@@ -192,6 +247,9 @@ export default function HomeScreen({ onOpenConversation }) {
                break;
             }
          }
+
+         placedX = clamp(placedX, minX, maxX);
+         placedY = clamp(placedY, minY, maxY);
 
          placedNodes.push({ x: placedX, y: placedY, size });
 
@@ -205,6 +263,43 @@ export default function HomeScreen({ onOpenConversation }) {
          };
       });
    }, [nodes, width, graphHeight]);
+
+   const totalPeople = nodes.length;
+   const totalSnippets = useMemo(
+      () =>
+         nodes.reduce(
+            (sum, person) => sum + (person?.conversationWeight || 0),
+            0
+         ),
+      [nodes]
+   );
+
+   const quickActions = [
+      {
+         label: 'Upload Memory',
+         description: 'Process a new video',
+         icon: '⬆️',
+         onPress: () => onNavigateTab?.('upload'),
+      },
+      {
+         label: 'Review Highlights',
+         description: 'See upcoming events',
+         icon: '✨',
+         onPress: () => onNavigateTab?.('highlights'),
+      },
+      {
+         label: 'Memory Library',
+         description: 'Browse every person',
+         icon: '📚',
+         onPress: () => onNavigateTab?.('memory'),
+      },
+   ];
+
+   const heroStats = [
+      { label: 'People Logged', value: totalPeople },
+      { label: 'Threads Logged', value: totalSnippets },
+      { label: 'Upcoming Highlights', value: highlightsPreview.length },
+   ];
 
    return (
       <LinearGradient
@@ -226,100 +321,221 @@ export default function HomeScreen({ onOpenConversation }) {
                showsVerticalScrollIndicator={false}
             >
                <View style={styles.heroCard}>
-                  <Text style={styles.heroTitle}>Meet your orbit</Text>
+                  <Text style={styles.heroEyebrow}>Command Center</Text>
+                  <Text style={styles.heroTitle}>Welcome back</Text>
                   <Text style={styles.heroCopy}>
-                     Each bubble is a person you have spoken with. Tap any face
-                     to open their latest conversation.
+                     Review your orbit, follow up on upcoming highlights, and
+                     keep every memory organized.
                   </Text>
-               </View>
-
-               {loading ? (
-                  <View style={styles.loadingState}>
-                     <ActivityIndicator
-                        size='large'
-                        color={retroPalette.violet}
-                     />
-                     <Text style={styles.loadingText}>
-                        Mapping your people…
-                     </Text>
-                  </View>
-               ) : error ? (
-                  <View style={styles.errorState}>
-                     <Text style={styles.errorText}>{error}</Text>
-                  </View>
-               ) : preparedNodes.length === 0 ? (
-                  <View style={styles.emptyState}>
-                     <Text style={styles.emptyTitle}>No faces yet</Text>
-                     <Text style={styles.emptyCopy}>
-                        Upload a video to enroll someone and start building the
-                        network.
-                     </Text>
-                  </View>
-               ) : (
-                  <View style={[styles.graphWrapper, { height: graphHeight }]}>
-                     {preparedNodes.map((node) => (
-                        <View
-                           key={node.name}
-                           style={[
-                              styles.nodeWrapper,
-                              {
-                                 left: node.x - node.size / 2,
-                                 top: node.y - node.size / 2,
-                                 width: node.size,
-                                 height: node.size,
-                              },
-                           ]}
-                        >
-                           <TouchableOpacity
-                              activeOpacity={0.85}
-                              onPress={() => {
-                                 if (!onOpenConversation || !node?.name) return;
-                                 onOpenConversation({
-                                    name: node.name,
-                                    avatarUrl: node.image_url,
-                                    headline: node.headline,
-                                 });
-                              }}
-                              style={[
-                                 styles.nodeTouchable,
-                                 {
-                                    borderRadius: node.size / 2,
-                                 },
-                              ]}
-                           >
-                              {node.image_url ? (
-                                 <Image
-                                    source={{ uri: node.image_url }}
-                                    style={styles.nodeImage}
-                                 />
-                              ) : (
-                                 <View style={styles.nodeFallback}>
-                                    <Text style={styles.nodeFallbackText}>
-                                       {node.name?.[0]?.toUpperCase() || '?'}
-                                    </Text>
-                                 </View>
-                              )}
-                           </TouchableOpacity>
-                           <View style={styles.nodeLabel}>
-                              <Text style={styles.nodeName}>
-                                 {node.name || 'Unknown'}
-                              </Text>
-                              <Text style={styles.nodeMeta}>
-                                 {node.share
-                                    ? `${node.share}% of memory`
-                                    : '0% of memory'}
-                              </Text>
-                           </View>
+                  <View style={styles.heroStatsRow}>
+                     {heroStats.map((stat) => (
+                        <View key={stat.label} style={styles.heroStat}>
+                           <Text style={styles.heroStatValue}>
+                              {stat.value.toLocaleString()}
+                           </Text>
+                           <Text style={styles.heroStatLabel}>
+                              {stat.label}
+                           </Text>
                         </View>
                      ))}
                   </View>
-               )}
+               </View>
 
-               <View style={styles.legend}>
-                  <View style={styles.legendDot} />
-                  <Text style={styles.legendText}>
-                     Tap a face to jump into their latest conversation.
-                  </Text>
+               <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                     <Text style={styles.sectionTitle}>Quick Actions</Text>
+                  </View>
+                  <View style={styles.quickActions}>
+                     {quickActions.map((action) => (
+                        <TouchableOpacity
+                           key={action.label}
+                           style={styles.quickActionCard}
+                           activeOpacity={0.9}
+                           onPress={action.onPress}
+                        >
+                           <Text style={styles.quickActionIcon}>
+                              {action.icon}
+                           </Text>
+                           <View style={styles.quickActionCopy}>
+                              <Text style={styles.quickActionLabel}>
+                                 {action.label}
+                              </Text>
+                              <Text style={styles.quickActionDescription}>
+                                 {action.description}
+                              </Text>
+                           </View>
+                        </TouchableOpacity>
+                     ))}
+                  </View>
+               </View>
+
+               <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                     <Text style={styles.sectionTitle}>Highlights Preview</Text>
+                     <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => onNavigateTab?.('highlights')}
+                     >
+                        <Text style={styles.sectionLink}>View all</Text>
+                     </TouchableOpacity>
+                  </View>
+                  {highlightsLoading ? (
+                     <View style={styles.sectionLoading}>
+                        <ActivityIndicator
+                           size='small'
+                           color={retroPalette.violet}
+                        />
+                        <Text style={styles.sectionLoadingText}>
+                           Scanning highlights…
+                        </Text>
+                     </View>
+                  ) : highlightsError ? (
+                     <Text style={styles.sectionEmpty}>{highlightsError}</Text>
+                  ) : highlightsPreview.length === 0 ? (
+                     <Text style={styles.sectionEmpty}>
+                        No highlights queued right now.
+                     </Text>
+                  ) : (
+                     highlightsPreview.map((item) => (
+                        <TouchableOpacity
+                           key={`${item.id}-${item.person_name}`}
+                           style={styles.highlightPreviewCard}
+                           activeOpacity={0.9}
+                           onPress={() =>
+                              onOpenConversation?.({
+                                 name: item.person_name,
+                                 headline: item.person_headline,
+                              })
+                           }
+                        >
+                           <View style={styles.highlightHeader}>
+                              <View>
+                                 <Text style={styles.highlightName}>
+                                    {item.person_name || 'Unknown'}
+                                 </Text>
+                                 <Text style={styles.highlightMeta}>
+                                    {formatEventDate(item.event_date)}
+                                    {item.category ? ` · ${item.category}` : ''}
+                                 </Text>
+                              </View>
+                              {formatCountdown(
+                                 item.event_timestamp,
+                                 item.event_date
+                              ) ? (
+                                 <View style={styles.countdownPill}>
+                                    <Text style={styles.countdownText}>
+                                       {formatCountdown(
+                                          item.event_timestamp,
+                                          item.event_date
+                                       )}
+                                    </Text>
+                                 </View>
+                              ) : null}
+                           </View>
+                           <Text style={styles.highlightSummary}>
+                              {item.summary || item.description}
+                           </Text>
+                        </TouchableOpacity>
+                     ))
+                  )}
+               </View>
+
+               <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeader}>
+                     <Text style={styles.sectionTitle}>Orbit Radar</Text>
+                  </View>
+                  {loading ? (
+                     <View style={styles.sectionLoading}>
+                        <ActivityIndicator
+                           size='large'
+                           color={retroPalette.violet}
+                        />
+                        <Text style={styles.sectionLoadingText}>
+                           Mapping your people…
+                        </Text>
+                     </View>
+                  ) : error ? (
+                     <Text style={styles.sectionEmpty}>{error}</Text>
+                  ) : preparedNodes.length === 0 ? (
+                     <Text style={styles.sectionEmpty}>
+                        Upload a video to enroll someone and start building the
+                        network.
+                     </Text>
+                  ) : (
+                     <>
+                        <View
+                           style={[
+                              styles.graphWrapper,
+                              { height: graphHeight },
+                           ]}
+                        >
+                           {preparedNodes.map((node) => (
+                              <View
+                                 key={node.name}
+                                 style={[
+                                    styles.nodeWrapper,
+                                    {
+                                       left: node.x - node.size / 2,
+                                       top: node.y - node.size / 2,
+                                       width: node.size,
+                                       height: node.size,
+                                    },
+                                 ]}
+                              >
+                                 <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    onPress={() => {
+                                       if (!onOpenConversation || !node?.name) {
+                                          return;
+                                       }
+                                       onOpenConversation({
+                                          name: node.name,
+                                          avatarUrl: node.image_url,
+                                          headline: node.headline,
+                                       });
+                                    }}
+                                    style={[
+                                       styles.nodeTouchable,
+                                       {
+                                          borderRadius: node.size / 2,
+                                       },
+                                    ]}
+                                 >
+                                    {node.image_url ? (
+                                       <Image
+                                          source={{ uri: node.image_url }}
+                                          style={styles.nodeImage}
+                                       />
+                                    ) : (
+                                       <View style={styles.nodeFallback}>
+                                          <Text style={styles.nodeFallbackText}>
+                                             {node.name?.[0]?.toUpperCase() ||
+                                                '?'}
+                                          </Text>
+                                       </View>
+                                    )}
+                                 </TouchableOpacity>
+                                 <View style={styles.nodeLabel}>
+                                    <Text style={styles.nodeName}>
+                                       {node.name || 'Unknown'}
+                                    </Text>
+                                    <Text style={styles.nodeMeta}>
+                                       {node.share
+                                          ? `${node.share}% of memories`
+                                          : '0% of memories'}
+                                    </Text>
+                                 </View>
+                              </View>
+                           ))}
+                        </View>
+                        <View style={styles.legend}>
+                           <View style={styles.legendDot} />
+                           <Text style={styles.legendText}>
+                              Tap a face to jump into their latest conversation.
+                           </Text>
+                        </View>
+                     </>
+                  )}
                </View>
             </ScrollView>
          </View>
@@ -337,6 +553,7 @@ const styles = StyleSheet.create({
       margin: 12,
       borderRadius: 24,
       borderWidth: 3,
+      marginTop: 46,
       borderColor: retroPalette.outline,
       backgroundColor: retroPalette.warmSand,
       shadowColor: '#1b0f2c',
@@ -374,11 +591,13 @@ const styles = StyleSheet.create({
    },
    windowBody: {
       flex: 1,
+      backgroundColor: 'transparent',
    },
    scrollContent: {
       paddingHorizontal: 20,
       paddingTop: 24,
       paddingBottom: 32,
+      gap: 18,
    },
    heroCard: {
       borderRadius: 28,
@@ -392,20 +611,13 @@ const styles = StyleSheet.create({
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 6 },
    },
-   heroBadge: {
-      alignSelf: 'flex-start',
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 999,
-      marginBottom: 16,
-   },
-   heroBadgeText: {
-      color: '#c7d2fe',
-      fontWeight: '600',
-      letterSpacing: 0.6,
-      fontSize: 12,
+   heroEyebrow: {
+      fontSize: 13,
+      color: retroPalette.violet,
+      letterSpacing: 1.2,
       textTransform: 'uppercase',
+      marginBottom: 6,
+      fontFamily: baseMono,
    },
    heroTitle: {
       fontSize: 30,
@@ -421,63 +633,165 @@ const styles = StyleSheet.create({
       lineHeight: 22,
       fontFamily: baseMono,
    },
-   subtitle: {
-      fontSize: 16,
-      color: '#475467',
-      marginBottom: 24,
-      lineHeight: 22,
-      fontFamily:
-         Platform.OS === 'ios'
-            ? 'American Typewriter'
-            : Platform.OS === 'android'
-            ? 'monospace'
-            : 'Courier New',
+   heroStatsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      rowGap: 12,
+      marginTop: 20,
    },
-   loadingState: {
-      alignItems: 'center',
-      paddingVertical: 60,
-   },
-   loadingText: {
-      marginTop: 12,
-      color: retroPalette.plum,
-      fontSize: 16,
-      fontFamily: baseMono,
-   },
-   errorState: {
-      padding: 20,
-      borderRadius: 20,
-      backgroundColor: '#ffd9e1',
+   heroStat: {
+      flexBasis: '30%',
+      flexGrow: 1,
+      backgroundColor: '#fbe9ff',
+      borderRadius: 18,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
       borderWidth: 2,
       borderColor: retroPalette.outline,
+      minWidth: 110,
    },
-   errorText: {
-      color: retroPalette.coral,
-      fontSize: 16,
-      textAlign: 'center',
-      fontFamily: baseMono,
-   },
-   emptyState: {
-      padding: 32,
-      borderRadius: 22,
-      backgroundColor: '#fffbe2',
-      alignItems: 'center',
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
-      shadowColor: '#2c0d38',
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-   },
-   emptyTitle: {
-      fontSize: 20,
-      color: retroPalette.outline,
+   heroStatValue: {
+      fontSize: 22,
       fontWeight: '700',
-      marginBottom: 6,
+      color: retroPalette.outline,
+      textAlign: 'center',
       fontFamily: headingFont,
    },
-   emptyCopy: {
-      color: retroPalette.plum,
+   heroStatLabel: {
+      fontSize: 12,
+      color: retroPalette.violet,
+      marginTop: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      flexWrap: 'wrap',
       textAlign: 'center',
+      fontFamily: baseMono,
+   },
+   sectionCard: {
+      backgroundColor: '#fff5dd',
+      borderRadius: 24,
+      padding: 20,
+      borderWidth: 3,
+      borderColor: retroPalette.outline,
+      shadowColor: '#1b0f2c',
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+   },
+   sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+   },
+   sectionTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: retroPalette.outline,
+      fontFamily: headingFont,
+   },
+   sectionLink: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: retroPalette.teal,
+      fontFamily: baseMono,
+   },
+   quickActions: {
+      gap: 12,
+   },
+   quickActionCard: {
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 18,
+      padding: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#fdf1ff',
+      shadowColor: '#1b0f2c',
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+   },
+   quickActionIcon: {
+      fontSize: 22,
+      marginRight: 12,
+   },
+   quickActionCopy: {
+      flex: 1,
+   },
+   quickActionLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: retroPalette.outline,
+      fontFamily: headingFont,
+   },
+   quickActionDescription: {
+      fontSize: 13,
+      color: retroPalette.plum,
+      marginTop: 2,
+      fontFamily: baseMono,
+   },
+   sectionLoading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+   },
+   sectionLoadingText: {
+      fontSize: 14,
+      color: retroPalette.plum,
+      fontFamily: baseMono,
+   },
+   sectionEmpty: {
+      fontSize: 14,
+      color: retroPalette.plum,
+      fontFamily: baseMono,
+   },
+   highlightPreviewCard: {
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 12,
+      backgroundColor: '#fffdf0',
+   },
+   highlightHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 6,
+   },
+   highlightName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: retroPalette.outline,
+      fontFamily: headingFont,
+   },
+   highlightMeta: {
+      fontSize: 13,
+      color: retroPalette.violet,
+      marginTop: 2,
+      fontFamily: baseMono,
+   },
+   highlightSummary: {
+      fontSize: 14,
+      color: retroPalette.plum,
+      lineHeight: 20,
+      fontFamily: baseMono,
+   },
+   countdownPill: {
+      borderRadius: 999,
+      backgroundColor: '#fef1bc',
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+   },
+   countdownText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: retroPalette.outline,
+      textTransform: 'uppercase',
       fontFamily: baseMono,
    },
    graphWrapper: {

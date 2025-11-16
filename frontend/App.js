@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
    View,
    StyleSheet,
@@ -72,6 +72,12 @@ export default function App() {
       });
       setActiveTab('memory');
    };
+
+   const handleNavigateTab = useCallback((tab) => {
+      if (!tab) return;
+      setActiveConversation(null);
+      setActiveTab(tab);
+   }, []);
 
    if (isCheckingAgreement) {
       return (
@@ -150,7 +156,10 @@ export default function App() {
             ) : (
                <>
                   {activeTab === 'home' && (
-                     <HomeScreen onOpenConversation={handleOpenConversation} />
+                     <HomeScreen
+                        onOpenConversation={handleOpenConversation}
+                        onNavigateTab={handleNavigateTab}
+                     />
                   )}
                   {activeTab === 'upload' && <UploadScreen />}
                   {activeTab === 'memory' && (

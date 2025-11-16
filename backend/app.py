@@ -322,6 +322,7 @@ def process_video(video_path):
         "conversation": transcript_result.get("conversation", []),
         "keywords": transcript_result.get("keywords", []),
         "headline": transcript_result.get("headline", ""),
+        "has_linkedin_potential": transcript_result.get("has_linkedin_potential", False),
         "face_status": face_result.get("status", "unknown"),
         "face_name": face_result.get("name"),
         "auto_enrolled": face_result.get("auto_enrolled", False),

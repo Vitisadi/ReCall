@@ -54,6 +54,7 @@ export default function HighlightsScreen({ onOpenConversation }) {
    const [loading, setLoading] = useState(true);
    const [refreshing, setRefreshing] = useState(false);
    const [error, setError] = useState('');
+   const [peopleIndex, setPeopleIndex] = useState({});
    const [actioning, setActioning] = useState(null);
 
    const fetchHighlights = useCallback(async (silent = false) => {
@@ -77,6 +78,26 @@ export default function HighlightsScreen({ onOpenConversation }) {
       fetchHighlights();
    }, [fetchHighlights]);
 
+   useEffect(() => {
+      let active = true;
+      axios
+         .get(`${BASE_URL}/api/people`)
+         .then((res) => {
+            if (!active) return;
+            const index = {};
+            (res.data || []).forEach((person) => {
+               if (person?.name) {
+                  index[person.name.toLowerCase()] = person;
+               }
+            });
+            setPeopleIndex(index);
+         })
+         .catch(() => {});
+      return () => {
+         active = false;
+      };
+   }, []);
+
    const handleRefresh = useCallback(() => {
       setRefreshing(true);
       fetchHighlights(true);
@@ -86,12 +107,18 @@ export default function HighlightsScreen({ onOpenConversation }) {
       (item) => {
          if (!item?.person_name || typeof onOpenConversation !== 'function')
             return;
+         const key = item.person_name.toLowerCase();
+         const personRecord = peopleIndex[key];
          onOpenConversation({
             name: item.person_name,
-            headline: item.person_headline,
+            headline: item.person_headline || personRecord?.headline,
+            avatarUrl:
+               item.person_image_url ||
+               item.image_url ||
+               personRecord?.image_url,
          });
       },
-      [onOpenConversation]
+      [onOpenConversation, peopleIndex]
    );
 
    const handleUpdateStatus = useCallback(async (highlightId, status) => {
@@ -116,6 +143,12 @@ export default function HighlightsScreen({ onOpenConversation }) {
    }, []);
 
    const renderHighlight = ({ item }) => {
+      const displayName = item.person_name
+         ? item.person_name
+              .split(' ')
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join(' ')
+         : 'Unknown';
       const countdown = formatCountdown(item.event_timestamp, item.event_date);
       const isActioning = actioning?.id === item.id;
       const workingStatus = isActioning ? actioning?.status : '';
@@ -127,9 +160,7 @@ export default function HighlightsScreen({ onOpenConversation }) {
             onPress={() => handleOpenPerson(item)}
          >
             <View style={styles.cardHeader}>
-               <Text style={styles.personName}>
-                  {item.person_name || 'Unknown'}
-               </Text>
+                <Text style={styles.personName}>{displayName}</Text>
                {countdown ? (
                   <View style={styles.countdownPill}>
                      <Text style={styles.countdownText}>{countdown}</Text>
@@ -261,6 +292,7 @@ export default function HighlightsScreen({ onOpenConversation }) {
       </>
    );
 }
+
 
 const styles = StyleSheet.create({
    gradient: { flex: 1 },
@@ -495,3 +527,4 @@ const styles = StyleSheet.create({
       fontFamily: retroFonts.base,
    },
 });
+
