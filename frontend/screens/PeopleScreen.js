@@ -133,6 +133,8 @@ export default function PeopleScreen({ onOpenConversation }) {
             name: match.name,
             highlightTimestamp: match.timestamp,
             highlightIndex: match.highlight_index,
+            avatarUrl: match.image_url || match.photo_url,
+            headline: match.headline,
          });
          return;
       }
@@ -163,14 +165,18 @@ export default function PeopleScreen({ onOpenConversation }) {
                      ) : null}
                   </View>
 
-                  <TouchableOpacity
-                     style={styles.sign}
-                     onPress={() =>
-                        onOpenConversation
-                           ? onOpenConversation({ name: person.name })
-                           : console.log('Open chat with', person.name)
-                     }
-                  >
+                   <TouchableOpacity
+                      style={styles.sign}
+                      onPress={() =>
+                         onOpenConversation
+                            ? onOpenConversation({
+                                 name: person.name,
+                                 avatarUrl: person.image_url,
+                                 headline: person.headline,
+                              })
+                            : console.log('Open chat with', person.name)
+                      }
+                   >
                      <Text style={styles.signText}>➜</Text>
                   </TouchableOpacity>
                </View>

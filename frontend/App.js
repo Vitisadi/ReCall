@@ -59,12 +59,20 @@ export default function App() {
       }
 
       if (payload && typeof payload === 'object') {
-         const { name, highlightTimestamp, highlightIndex } = payload;
+         const {
+            name,
+            highlightTimestamp,
+            highlightIndex,
+            avatarUrl,
+            headline,
+         } = payload;
          if (!name) return;
          setActiveConversation({
             name,
             highlightTimestamp,
             highlightIndex,
+            avatarUrl,
+            headline,
          });
       }
    };
@@ -135,17 +143,23 @@ export default function App() {
       <SafeAreaView style={{ flex: 1 }}>
          <View style={styles.container}>
             {activeConversation ? (
-               <ConversationScreen
-                  name={activeConversation.name}
-                  highlightTimestamp={activeConversation.highlightTimestamp}
-                  highlightIndex={activeConversation.highlightIndex}
-                  onBack={() => setActiveConversation(null)}
-               />
+                <ConversationScreen
+                   name={activeConversation.name}
+                   avatarUrl={activeConversation.avatarUrl}
+                   headline={activeConversation.headline}
+                   highlightTimestamp={activeConversation.highlightTimestamp}
+                   highlightIndex={activeConversation.highlightIndex}
+                   onBack={() => setActiveConversation(null)}
+                />
             ) : (
                <>
-                  {activeTab === 'home' && <HomeScreen />}
+                  {activeTab === 'home' && (
+                     <HomeScreen
+                        onOpenConversation={handleOpenConversation}
+                     />
+                  )}
                   {activeTab === 'upload' && <UploadScreen />}
-                  {activeTab === 'contact' && (
+                  {activeTab === 'memory' && (
                      <PeopleScreen
                         onOpenConversation={handleOpenConversation}
                      />
@@ -200,20 +214,20 @@ export default function App() {
                   style={[
                      styles.navItem,
                      styles.navSeparator,
-                     activeTab === 'contact' && styles.navItemActive,
+                     activeTab === 'memory' && styles.navItemActive,
                   ]}
                   onPress={() => {
                      setActiveConversation(null);
-                     setActiveTab('contact');
+                     setActiveTab('memory');
                   }}
                >
                   <Text
                      style={[
                         styles.navText,
-                        activeTab === 'contact' && styles.navTextActive,
+                        activeTab === 'memory' && styles.navTextActive,
                      ]}
                   >
-                     Contact
+                     Memory
                   </Text>
                </TouchableOpacity>
             </View>
