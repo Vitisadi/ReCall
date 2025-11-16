@@ -14,6 +14,11 @@ import PeopleScreen from './screens/PeopleScreen';
 import UploadScreen from './screens/UploadScreen';
 import ConversationScreen from './screens/ConversationScreen';
 import HighlightsScreen from './screens/HighlightsScreen';
+import RetroHomeScreen from './screens/RetroHomeScreen';
+import RetroPeopleScreen from './screens/RetroPeopleScreen';
+import RetroUploadScreen from './screens/RetroUploadScreen';
+import RetroConversationScreen from './screens/RetroConversationScreen';
+import RetroHighlightsScreen from './screens/RetroHighlightsScreen';
 
 const AGREEMENT_STORAGE_KEY = 'upload_agreement_accepted_v1';
 

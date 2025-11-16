@@ -9,7 +9,9 @@ import {
    View,
 } from 'react-native';
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BASE_URL } from '../config';
+import { retroFonts, retroPalette, retroMenuItems } from '../styles/retroTheme';
 
 const formatEventDate = (iso) => {
    if (!iso) return 'Unknown date';
@@ -47,7 +49,7 @@ const formatCountdown = (timestamp, fallbackIso) => {
    return `In ${days} days`;
 };
 
-export default function HighlightsScreen({ onOpenConversation }) {
+export default function RetroHighlightsScreen({ onOpenConversation }) {
    const [highlights, setHighlights] = useState([]);
    const [loading, setLoading] = useState(true);
    const [refreshing, setRefreshing] = useState(false);
@@ -220,17 +222,36 @@ export default function HighlightsScreen({ onOpenConversation }) {
       );
    };
 
+   const renderChrome = (children) => (
+      <LinearGradient
+         colors={[retroPalette.sunsetStart, retroPalette.sunsetEnd]}
+         style={styles.gradient}
+      >
+         <View style={styles.window}>
+            <View style={styles.menuBar}>
+               {retroMenuItems.map((item) => (
+                  <Text key={item} style={styles.menuItem}>
+                     {item}
+                  </Text>
+               ))}
+               <View style={styles.menuLed} />
+            </View>
+            <View style={styles.windowBody}>{children}</View>
+         </View>
+      </LinearGradient>
+   );
+
    if (loading && !refreshing && highlights.length === 0 && !error) {
-      return (
+      return renderChrome(
          <View style={styles.loadingState}>
-            <ActivityIndicator color='#007AFF' size='large' />
+            <ActivityIndicator color={retroPalette.violet} size='large' />
             <Text style={styles.loadingCopy}>Scanning for highlights…</Text>
          </View>
       );
    }
 
-   return (
-      <View style={styles.screen}>
+   return renderChrome(
+      <>
          <View style={styles.headerRow}>
             <Text style={styles.header}>Upcoming Highlights</Text>
             <TouchableOpacity
@@ -268,46 +289,95 @@ export default function HighlightsScreen({ onOpenConversation }) {
                )
             }
          />
-      </View>
+      </>
    );
 }
 
 const styles = StyleSheet.create({
-   screen: {
+   gradient: { flex: 1 },
+   window: {
       flex: 1,
-      backgroundColor: '#f7f7f7',
-      paddingTop: 40,
+      margin: 12,
+      borderRadius: 24,
+      borderWidth: 3,
+      marginTop: 46,
+      borderColor: retroPalette.outline,
+      backgroundColor: retroPalette.warmSand,
+      shadowColor: '#1b0f2c',
+      shadowOpacity: 0.32,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      overflow: 'hidden',
+   },
+   menuBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: retroPalette.menuGray,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+      paddingBottom: 8,
+      borderBottomWidth: 2,
+      borderBottomColor: retroPalette.outline,
+   },
+   menuItem: {
+      marginRight: 18,
+      fontSize: 13,
+      color: retroPalette.menuText,
+      fontFamily: retroFonts.heading,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+   },
+   menuLed: {
+      marginLeft: 'auto',
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: retroPalette.teal,
+      borderWidth: 1,
+      borderColor: retroPalette.outline,
+   },
+   windowBody: {
+      flex: 1,
+      padding: 18,
    },
    headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingTop: 16,
-      paddingBottom: 8,
-      marginTop: 36,
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
+      marginTop: 8,
    },
    header: {
-      fontSize: 22,
-      marginTop: 36,
+      fontSize: 26,
       fontWeight: '700',
-      color: '#111',
+      color: retroPalette.outline,
+      fontFamily: retroFonts.heading,
+      textTransform: 'uppercase',
    },
    refreshButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: '#e4e9ff',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      backgroundColor: '#f4c9ff',
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
    },
    refreshLabel: {
-      fontSize: 18,
-      color: '#4a63ff',
+      fontSize: 20,
+      color: retroPalette.violet,
       fontWeight: '700',
+      fontFamily: retroFonts.heading,
    },
    listContent: {
-      paddingHorizontal: 20,
+      paddingHorizontal: 4,
       paddingBottom: 80,
    },
    emptyContainer: {
@@ -316,15 +386,17 @@ const styles = StyleSheet.create({
       paddingHorizontal: 32,
    },
    card: {
-      backgroundColor: '#fff',
-      borderRadius: 16,
+      backgroundColor: '#fff5dd',
+      borderRadius: 20,
       padding: 16,
       marginBottom: 16,
-      shadowColor: '#000',
-      shadowOpacity: 0.05,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 2,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 5,
    },
    cardHeader: {
       flexDirection: 'row',
@@ -335,39 +407,47 @@ const styles = StyleSheet.create({
    personName: {
       fontSize: 18,
       fontWeight: '700',
-      color: '#07203f',
+      color: retroPalette.outline,
+      fontFamily: retroFonts.heading,
    },
    countdownPill: {
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 999,
-      backgroundColor: '#eef3ff',
+      backgroundColor: '#f7d6ff',
+      borderWidth: 1,
+      borderColor: retroPalette.outline,
    },
    countdownText: {
       fontSize: 12,
       fontWeight: '600',
-      color: '#1f4eff',
+      color: retroPalette.violet,
+      fontFamily: retroFonts.base,
       textTransform: 'uppercase',
    },
    summary: {
       fontSize: 16,
       fontWeight: '600',
-      color: '#111',
+      color: retroPalette.plum,
+      fontFamily: retroFonts.base,
    },
    eventDate: {
       fontSize: 14,
-      color: '#4a4a4a',
+      color: retroPalette.violet,
       marginBottom: 6,
+      fontFamily: retroFonts.base,
    },
    description: {
       fontSize: 14,
-      color: '#333',
+      color: retroPalette.plum,
       marginBottom: 6,
+      fontFamily: retroFonts.base,
    },
    quote: {
       fontStyle: 'italic',
-      color: '#666',
+      color: retroPalette.violet,
       marginBottom: 8,
+      fontFamily: retroFonts.base,
    },
    metaRow: {
       flexDirection: 'row',
@@ -377,7 +457,8 @@ const styles = StyleSheet.create({
    },
    metaText: {
       fontSize: 12,
-      color: '#777',
+      color: retroPalette.plum,
+      fontFamily: retroFonts.base,
    },
    actionsRow: {
       flexDirection: 'row',
@@ -385,23 +466,26 @@ const styles = StyleSheet.create({
    },
    actionButton: {
       flex: 1,
-      borderRadius: 999,
-      paddingVertical: 10,
+      borderRadius: 16,
+      paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
       marginHorizontal: 4,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    completeButton: {
-      backgroundColor: '#0d9b6c',
+      backgroundColor: retroPalette.teal,
    },
    dismissButton: {
-      backgroundColor: '#f05a4f',
+      backgroundColor: retroPalette.coral,
    },
    actionButtonText: {
       color: '#fff',
       fontWeight: '700',
       textTransform: 'uppercase',
       fontSize: 13,
+      fontFamily: retroFonts.heading,
    },
    actionButtonDisabled: {
       opacity: 0.55,
@@ -410,17 +494,19 @@ const styles = StyleSheet.create({
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#fff',
+      paddingTop: 80,
    },
    loadingCopy: {
       marginTop: 12,
       fontSize: 15,
-      color: '#555',
+      color: retroPalette.menuText,
+      fontFamily: retroFonts.base,
    },
    errorText: {
-      color: '#c0392b',
-      marginHorizontal: 20,
+      color: retroPalette.coral,
+      marginHorizontal: 12,
       marginBottom: 8,
+      fontFamily: retroFonts.base,
    },
    emptyState: {
       alignItems: 'center',
@@ -429,12 +515,14 @@ const styles = StyleSheet.create({
    emptyHeader: {
       fontSize: 18,
       fontWeight: '600',
-      color: '#222',
+      color: retroPalette.outline,
+      fontFamily: retroFonts.heading,
       marginBottom: 6,
    },
    emptyCopy: {
       fontSize: 14,
-      color: '#666',
+      color: retroPalette.plum,
       textAlign: 'center',
+      fontFamily: retroFonts.base,
    },
 });

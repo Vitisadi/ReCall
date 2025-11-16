@@ -12,10 +12,8 @@ import {
    ScrollView,
    KeyboardAvoidingView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { BASE_URL } from '../config';
-import { retroFonts, retroPalette, retroMenuItems } from '../styles/retroTheme';
 
 export default function UploadScreen() {
    const [file, setFile] = useState(null);
@@ -313,524 +311,435 @@ export default function UploadScreen() {
          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-         <LinearGradient
-            colors={[retroPalette.sunsetStart, retroPalette.sunsetEnd]}
-            style={styles.gradient}
+         <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps='handled'
          >
-            <View style={styles.window}>
-               <View style={styles.menuBar}>
-                  {retroMenuItems.map((item) => (
-                     <Text key={item} style={styles.menuItem}>
-                        {item}
-                     </Text>
-                  ))}
-                  <View style={styles.menuLed} />
-               </View>
-               <ScrollView
-                  style={styles.windowBody}
-                  contentContainerStyle={styles.scrollContent}
-                  keyboardShouldPersistTaps='handled'
+            <View style={styles.uploadBox}>
+               <Text style={styles.title}>Upload Video</Text>
+
+               <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={pickVideo}
                >
-                  <View style={styles.uploadBox}>
-                     <Text style={styles.title}>Upload Video</Text>
+                  <Text style={styles.selectButtonText}>
+                     {file ? file.name : 'Select Video'}
+                  </Text>
+               </TouchableOpacity>
 
-                     <TouchableOpacity
-                        style={styles.selectButton}
-                        onPress={pickVideo}
-                     >
-                        <Text style={styles.selectButtonText}>
-                           {file ? file.name : 'Select Video'}
-                        </Text>
-                     </TouchableOpacity>
-
-                     {file && (
-                        <TouchableOpacity
-                           style={styles.processButton}
-                           onPress={processVideo}
-                           disabled={processing}
-                        >
-                           {processing ? (
-                              <ActivityIndicator color='#fff' />
-                           ) : (
-                              <Text style={styles.processButtonText}>
-                                 Process
-                              </Text>
-                           )}
-                        </TouchableOpacity>
+               {file && (
+                  <TouchableOpacity
+                     style={styles.processButton}
+                     onPress={processVideo}
+                     disabled={processing}
+                  >
+                     {processing ? (
+                        <ActivityIndicator color='#fff' />
+                     ) : (
+                        <Text style={styles.processButtonText}>Process</Text>
                      )}
-                  </View>
+                  </TouchableOpacity>
+               )}
+            </View>
 
-                  {steps && steps.length > 0 && (
-                     <View style={styles.stepsContainer}>
-                        {steps.map((s, i) => (
-                           <View key={s.key} style={styles.stepRow}>
-                              <View style={{ flex: 1 }}>
-                                 <Text style={styles.stepLabel}>{s.label}</Text>
-                                 <ProgressBar progress={s.progress || 0} />
-                              </View>
-                              <View style={styles.stepStatus}>
-                                 {s.done ? (
-                                    <Text style={styles.check}>✅</Text>
-                                 ) : processing &&
-                                   i === steps.findIndex((x) => !x.done) ? (
-                                    <ActivityIndicator
-                                       size='small'
-                                       color={retroPalette.violet}
-                                    />
-                                 ) : (
-                                    <Text style={styles.percent}>
-                                       {Math.round(s.progress || 0)}%
-                                    </Text>
-                                 )}
-                              </View>
-                           </View>
-                        ))}
-                     </View>
-                  )}
-
-                  {result && result.ok && result.data.face_name && (
-                     <View style={styles.successCard}>
-                        <View style={styles.cardContent}>
-                           <Image
-                              source={{
-                                 uri: `${BASE_URL}/faces/${result.data.face_name.toLowerCase()}.jpg`,
-                              }}
-                              style={styles.cardImage}
-                           />
-                           <View style={styles.cardTextWrapper}>
-                              {!isEditingName && !showConfirmPrompt && (
-                                 <>
-                                    <Text style={styles.cardName}>
-                                       {result.data.face_name.toUpperCase()}
-                                    </Text>
-                                    <Text style={styles.cardSubtext}>
-                                       {result.data.headline
-                                          ? formatHeadline(result.data.headline)
-                                          : 'Conversation saved'}
-                                    </Text>
-                                 </>
-                              )}
-                              {isEditingName && !showConfirmPrompt && (
-                                 <TextInput
-                                    style={styles.nameInput}
-                                    value={editedName}
-                                    onChangeText={setEditedName}
-                                    autoFocus
-                                    placeholder='Enter name'
-                                    returnKeyType='done'
-                                    onSubmitEditing={() => {
-                                       if (editedName.trim()) {
-                                          setShowConfirmPrompt(true);
-                                       } else {
-                                          Alert.alert(
-                                             'Error',
-                                             'Name cannot be empty'
-                                          );
-                                       }
-                                    }}
-                                 />
-                              )}
-                              {showConfirmPrompt && (
-                                 <View style={styles.confirmBlock}>
-                                    <Text style={styles.confirmQuestion}>
-                                       Is this name right?
-                                    </Text>
-                                    <Text style={styles.proposedName}>
-                                       {editedName.trim().toUpperCase()}
-                                    </Text>
-                                 </View>
-                              )}
-                           </View>
-                           {/* Action buttons */}
-                           {result.data.face_status !== 'old' &&
-                              !isEditingName &&
-                              !showConfirmPrompt &&
-                              !keywordsVisible && (
-                                 <TouchableOpacity
-                                    style={styles.editButton}
-                                    onPress={() => {
-                                       setIsEditingName(true);
-                                       setEditedName(result.data.face_name);
-                                    }}
-                                 >
-                                    <Text style={styles.editIcon}>✏️</Text>
-                                 </TouchableOpacity>
-                              )}
-                           {isEditingName && !showConfirmPrompt && (
-                              <TouchableOpacity
-                                 style={styles.reviewButton}
-                                 onPress={() => {
-                                    if (!editedName.trim()) {
-                                       Alert.alert(
-                                          'Error',
-                                          'Name cannot be empty'
-                                       );
-                                       return;
-                                    }
-                                    setShowConfirmPrompt(true);
-                                 }}
-                              >
-                                 <Text style={styles.reviewText}>Review</Text>
-                              </TouchableOpacity>
-                           )}
-                           {showConfirmPrompt && (
-                              <View style={styles.confirmButtonsRow}>
-                                 <TouchableOpacity
-                                    style={styles.yesButton}
-                                    onPress={async () => {
-                                       const newName = editedName.trim();
-                                       if (!newName) {
-                                          Alert.alert(
-                                             'Error',
-                                             'Name cannot be empty'
-                                          );
-                                          return;
-                                       }
-                                       // If unchanged, just exit without calling backend
-                                       if (
-                                          newName.toLowerCase() ===
-                                          result.data.face_name.toLowerCase()
-                                       ) {
-                                          // Do not fetch LinkedIn or show keywords yet; mirror non-edit flow
-                                          setIsEditingName(false);
-                                          setShowConfirmPrompt(false);
-                                          setKeywordsVisible(false);
-                                          Alert.alert(
-                                             'Saved',
-                                             'Name unchanged. Tap CONFIRM to continue.'
-                                          );
-                                          return;
-                                       }
-                                       try {
-                                          const res = await fetch(
-                                             `${BASE_URL}/api/rename`,
-                                             {
-                                                method: 'POST',
-                                                headers: {
-                                                   'Content-Type':
-                                                      'application/json',
-                                                },
-                                                body: JSON.stringify({
-                                                   old_name:
-                                                      result.data.face_name,
-                                                   new_name: newName,
-                                                }),
-                                             }
-                                          );
-                                          const data = await res.json();
-                                          if (res.ok) {
-                                             setResult({
-                                                ...result,
-                                                data: {
-                                                   ...result.data,
-                                                   face_name: newName,
-                                                },
-                                             });
-                                             // Defer enrichment to the CONFIRM action for consistent flow
-                                             setIsEditingName(false);
-                                             setShowConfirmPrompt(false);
-                                             setKeywordsVisible(false);
-                                             Alert.alert(
-                                                'Success',
-                                                'Name updated! Tap CONFIRM to continue.'
-                                             );
-                                          } else {
-                                             Alert.alert(
-                                                'Error',
-                                                data.error || 'Failed to rename'
-                                             );
-                                          }
-                                       } catch (e) {
-                                          Alert.alert('Error', String(e));
-                                       }
-                                    }}
-                                 >
-                                    <Text style={styles.yesText}>Yes</Text>
-                                 </TouchableOpacity>
-                                 <TouchableOpacity
-                                    style={styles.cancelButton}
-                                    onPress={() => {
-                                       setShowConfirmPrompt(false);
-                                       // stay in editing mode to adjust further
-                                    }}
-                                 >
-                                    <Text style={styles.cancelText}>
-                                       Cancel
-                                    </Text>
-                                 </TouchableOpacity>
-                              </View>
+            {steps && steps.length > 0 && (
+               <View style={styles.stepsContainer}>
+                  {steps.map((s, i) => (
+                     <View key={s.key} style={styles.stepRow}>
+                        <View style={{ flex: 1 }}>
+                           <Text style={styles.stepLabel}>{s.label}</Text>
+                           <ProgressBar progress={s.progress || 0} />
+                        </View>
+                        <View style={styles.stepStatus}>
+                           {s.done ? (
+                              <Text style={styles.check}>✅</Text>
+                           ) : processing &&
+                             i === steps.findIndex((x) => !x.done) ? (
+                              <ActivityIndicator size='small' color='#000' />
+                           ) : (
+                              <Text style={styles.percent}>
+                                 {Math.round(s.progress || 0)}%
+                              </Text>
                            )}
                         </View>
-                        {keywordsVisible &&
-                           Array.isArray(result.data.keywords) &&
-                           result.data.keywords.length > 0 && (
-                              <View style={styles.keywordsBox}>
-                                 <Text style={styles.keywordsTitle}>
-                                    Keywords found:
-                                 </Text>
-                                 <View style={styles.keywordsRow}>
-                                    {result.data.keywords.map((kw) => (
-                                       <View
-                                          key={kw}
-                                          style={styles.keywordPill}
-                                       >
-                                          <Text style={styles.keywordText}>
-                                             {kw}
-                                          </Text>
-                                       </View>
-                                    ))}
-                                 </View>
-                              </View>
-                           )}
-                        {keywordsVisible &&
-                           (!result.data.keywords ||
-                              result.data.keywords.length === 0) && (
-                              <View style={styles.keywordsBox}>
-                                 <Text style={styles.keywordsTitle}>
-                                    No searchable keywords detected.
-                                 </Text>
-                              </View>
-                           )}
-                        {keywordsVisible && linkedinUrl && (
-                           <View style={styles.linkedinWrapper}>
-                              <Text style={styles.experimentalFlag}>
-                                 Experimental Feature
+                     </View>
+                  ))}
+               </View>
+            )}
+
+            {result && result.ok && result.data.face_name && (
+               <View style={styles.successCard}>
+                  <View style={styles.cardContent}>
+                     <Image
+                        source={{
+                           uri: `${BASE_URL}/faces/${result.data.face_name.toLowerCase()}.jpg`,
+                        }}
+                        style={styles.cardImage}
+                     />
+                     <View style={styles.cardTextWrapper}>
+                        {!isEditingName && !showConfirmPrompt && (
+                           <>
+                              <Text style={styles.cardName}>
+                                 {result.data.face_name.toUpperCase()}
                               </Text>
-                              <TouchableOpacity
-                                 style={styles.linkedinBox}
-                                 onPress={() => {
-                                    // Open LinkedIn URL in browser
-                                    if (Platform.OS === 'web') {
-                                       window.open(linkedinUrl, '_blank');
-                                    } else {
-                                       const {
-                                          Linking,
-                                       } = require('react-native');
-                                       Linking.openURL(linkedinUrl);
-                                    }
-                                 }}
-                              >
-                                 <View style={styles.linkedinContent}>
-                                    <Text style={styles.linkedinIcon}>in</Text>
-                                    <Text style={styles.linkedinText}>
-                                       View LinkedIn Profile
-                                    </Text>
-                                 </View>
-                              </TouchableOpacity>
-                              <Text style={styles.linkedinUrlText}>
-                                 {linkedinUrl}
+                              <Text style={styles.cardSubtext}>
+                                 {result.data.headline
+                                    ? formatHeadline(result.data.headline)
+                                    : 'Conversation saved'}
+                              </Text>
+                           </>
+                        )}
+                        {isEditingName && !showConfirmPrompt && (
+                           <TextInput
+                              style={styles.nameInput}
+                              value={editedName}
+                              onChangeText={setEditedName}
+                              autoFocus
+                              placeholder='Enter name'
+                              returnKeyType='done'
+                              onSubmitEditing={() => {
+                                 if (editedName.trim()) {
+                                    setShowConfirmPrompt(true);
+                                 } else {
+                                    Alert.alert(
+                                       'Error',
+                                       'Name cannot be empty'
+                                    );
+                                 }
+                              }}
+                           />
+                        )}
+                        {showConfirmPrompt && (
+                           <View style={styles.confirmBlock}>
+                              <Text style={styles.confirmQuestion}>
+                                 Is this name right?
+                              </Text>
+                              <Text style={styles.proposedName}>
+                                 {editedName.trim().toUpperCase()}
                               </Text>
                            </View>
                         )}
                      </View>
-                  )}
-                  {result &&
-                     result.ok &&
-                     result.data.face_name &&
-                     !isEditingName &&
-                     !showConfirmPrompt &&
-                     !keywordsVisible && (
-                        <>
-                           {result.data.has_linkedin_potential ? (
-                              <>
-                                 <TouchableOpacity
-                                    style={styles.confirmAcceptButton}
-                                    onPress={async () => {
-                                       if (
-                                          !result?.data?.face_name ||
-                                          linkedinLoading
-                                       )
-                                          return;
-                                       setLinkedinLoading(true);
-                                       setLinkedinProgress(0);
-                                       // simple progress animation
-                                       linkedinTimer.current = setInterval(
-                                          () => {
-                                             setLinkedinProgress((p) =>
-                                                Math.min(
-                                                   94,
-                                                   p + (5 + Math.random() * 7)
-                                                )
-                                             );
-                                          },
-                                          280
-                                       );
-                                       try {
-                                          await triggerLinkedInEnrichment(
-                                             result.data.face_name
-                                          );
-                                          await updateHeadlineFromConversation(
-                                             result.data.face_name
-                                          );
-                                       } finally {
-                                          if (linkedinTimer.current) {
-                                             clearInterval(
-                                                linkedinTimer.current
-                                             );
-                                             linkedinTimer.current = null;
-                                          }
-                                          setLinkedinProgress(100);
-                                          setLinkedinLoading(false);
-                                          // Always reveal keywords after enrichment attempt
-                                          setKeywordsVisible(true);
-                                       }
-                                    }}
-                                 >
-                                    <Text style={styles.confirmAcceptText}>
-                                       Find More Data
-                                    </Text>
-                                 </TouchableOpacity>
-                                 {linkedinLoading && (
-                                    <View
-                                       style={{ width: '100%', marginTop: 8 }}
-                                    >
-                                       <ProgressBar
-                                          progress={linkedinProgress}
-                                       />
-                                    </View>
-                                 )}
-                              </>
-                           ) : (
-                              <View
-                                 style={{
-                                    marginTop: 12,
-                                    width: '100%',
-                                    alignItems: 'center',
-                                 }}
-                              >
-                                 <Text
-                                    style={{
-                                       fontSize: 14,
-                                       color: retroPalette.plum,
-                                       fontFamily: baseMono,
-                                    }}
-                                 >
-                                    Conversation recorded
-                                 </Text>
-                              </View>
-                           )}
-                        </>
+                     {/* Action buttons */}
+                     {result.data.face_status !== 'old' &&
+                        !isEditingName &&
+                        !showConfirmPrompt &&
+                        !keywordsVisible && (
+                           <TouchableOpacity
+                              style={styles.editButton}
+                              onPress={() => {
+                                 setIsEditingName(true);
+                                 setEditedName(result.data.face_name);
+                              }}
+                           >
+                              <Text style={styles.editIcon}>✏️</Text>
+                           </TouchableOpacity>
+                        )}
+                     {isEditingName && !showConfirmPrompt && (
+                        <TouchableOpacity
+                           style={styles.reviewButton}
+                           onPress={() => {
+                              if (!editedName.trim()) {
+                                 Alert.alert('Error', 'Name cannot be empty');
+                                 return;
+                              }
+                              setShowConfirmPrompt(true);
+                           }}
+                        >
+                           <Text style={styles.reviewText}>Review</Text>
+                        </TouchableOpacity>
                      )}
-
-                  {result && !result.ok && (
-                     <View style={styles.resultBox}>
-                        <Text style={styles.resultTitle}>
-                           Processing failed
+                     {showConfirmPrompt && (
+                        <View style={styles.confirmButtonsRow}>
+                           <TouchableOpacity
+                              style={styles.yesButton}
+                              onPress={async () => {
+                                 const newName = editedName.trim();
+                                 if (!newName) {
+                                    Alert.alert(
+                                       'Error',
+                                       'Name cannot be empty'
+                                    );
+                                    return;
+                                 }
+                                 // If unchanged, just exit without calling backend
+                                 if (
+                                    newName.toLowerCase() ===
+                                    result.data.face_name.toLowerCase()
+                                 ) {
+                                    // Do not fetch LinkedIn or show keywords yet; mirror non-edit flow
+                                    setIsEditingName(false);
+                                    setShowConfirmPrompt(false);
+                                    setKeywordsVisible(false);
+                                    Alert.alert(
+                                       'Saved',
+                                       'Name unchanged. Tap CONFIRM to continue.'
+                                    );
+                                    return;
+                                 }
+                                 try {
+                                    const res = await fetch(
+                                       `${BASE_URL}/api/rename`,
+                                       {
+                                          method: 'POST',
+                                          headers: {
+                                             'Content-Type': 'application/json',
+                                          },
+                                          body: JSON.stringify({
+                                             old_name: result.data.face_name,
+                                             new_name: newName,
+                                          }),
+                                       }
+                                    );
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                       setResult({
+                                          ...result,
+                                          data: {
+                                             ...result.data,
+                                             face_name: newName,
+                                          },
+                                       });
+                                       // Defer enrichment to the CONFIRM action for consistent flow
+                                       setIsEditingName(false);
+                                       setShowConfirmPrompt(false);
+                                       setKeywordsVisible(false);
+                                       Alert.alert(
+                                          'Success',
+                                          'Name updated! Tap CONFIRM to continue.'
+                                       );
+                                    } else {
+                                       Alert.alert(
+                                          'Error',
+                                          data.error || 'Failed to rename'
+                                       );
+                                    }
+                                 } catch (e) {
+                                    Alert.alert('Error', String(e));
+                                 }
+                              }}
+                           >
+                              <Text style={styles.yesText}>Yes</Text>
+                           </TouchableOpacity>
+                           <TouchableOpacity
+                              style={styles.cancelButton}
+                              onPress={() => {
+                                 setShowConfirmPrompt(false);
+                                 // stay in editing mode to adjust further
+                              }}
+                           >
+                              <Text style={styles.cancelText}>Cancel</Text>
+                           </TouchableOpacity>
+                        </View>
+                     )}
+                  </View>
+                  {keywordsVisible &&
+                     Array.isArray(result.data.keywords) &&
+                     result.data.keywords.length > 0 && (
+                        <View style={styles.keywordsBox}>
+                           <Text style={styles.keywordsTitle}>
+                              Keywords found:
+                           </Text>
+                           <View style={styles.keywordsRow}>
+                              {result.data.keywords.map((kw) => (
+                                 <View key={kw} style={styles.keywordPill}>
+                                    <Text style={styles.keywordText}>{kw}</Text>
+                                 </View>
+                              ))}
+                           </View>
+                        </View>
+                     )}
+                  {keywordsVisible &&
+                     (!result.data.keywords ||
+                        result.data.keywords.length === 0) && (
+                        <View style={styles.keywordsBox}>
+                           <Text style={styles.keywordsTitle}>
+                              No searchable keywords detected.
+                           </Text>
+                        </View>
+                     )}
+                  {keywordsVisible && linkedinUrl && (
+                     <View style={styles.linkedinWrapper}>
+                        <Text style={styles.experimentalFlag}>
+                           Experimental Feature
                         </Text>
-                        <Text style={styles.resultText}>
-                           {JSON.stringify(result.data)}
+                        <TouchableOpacity
+                           style={styles.linkedinBox}
+                           onPress={() => {
+                              // Open LinkedIn URL in browser
+                              if (Platform.OS === 'web') {
+                                 window.open(linkedinUrl, '_blank');
+                              } else {
+                                 const { Linking } = require('react-native');
+                                 Linking.openURL(linkedinUrl);
+                              }
+                           }}
+                        >
+                           <View style={styles.linkedinContent}>
+                              <Text style={styles.linkedinIcon}>in</Text>
+                              <Text style={styles.linkedinText}>
+                                 View LinkedIn Profile
+                              </Text>
+                           </View>
+                        </TouchableOpacity>
+                        <Text style={styles.linkedinUrlText}>
+                           {linkedinUrl}
                         </Text>
                      </View>
                   )}
-               </ScrollView>
-            </View>
-         </LinearGradient>
+               </View>
+            )}
+            {result &&
+               result.ok &&
+               result.data.face_name &&
+               !isEditingName &&
+               !showConfirmPrompt &&
+               !keywordsVisible && (
+                  <>
+                     {result.data.has_linkedin_potential ? (
+                        <>
+                           <TouchableOpacity
+                              style={styles.confirmAcceptButton}
+                              onPress={async () => {
+                                 if (
+                                    !result?.data?.face_name ||
+                                    linkedinLoading
+                                 )
+                                    return;
+                                 setLinkedinLoading(true);
+                                 setLinkedinProgress(0);
+                                 // simple progress animation
+                                 linkedinTimer.current = setInterval(() => {
+                                    setLinkedinProgress((p) =>
+                                       Math.min(94, p + (5 + Math.random() * 7))
+                                    );
+                                 }, 280);
+                                 try {
+                                    await triggerLinkedInEnrichment(
+                                       result.data.face_name
+                                    );
+                                    await updateHeadlineFromConversation(
+                                       result.data.face_name
+                                    );
+                                 } finally {
+                                    if (linkedinTimer.current) {
+                                       clearInterval(linkedinTimer.current);
+                                       linkedinTimer.current = null;
+                                    }
+                                    setLinkedinProgress(100);
+                                    setLinkedinLoading(false);
+                                    // Always reveal keywords after enrichment attempt
+                                    setKeywordsVisible(true);
+                                 }
+                              }}
+                           >
+                              <Text style={styles.confirmAcceptText}>
+                                 Find More Data
+                              </Text>
+                           </TouchableOpacity>
+                           {linkedinLoading && (
+                              <View style={{ width: '100%', marginTop: 8 }}>
+                                 <ProgressBar progress={linkedinProgress} />
+                              </View>
+                           )}
+                        </>
+                     ) : (
+                        <View
+                           style={{
+                              marginTop: 12,
+                              width: '100%',
+                              alignItems: 'center',
+                           }}
+                        >
+                           <Text
+                              style={{
+                                 fontSize: 14,
+                                 color: '#666',
+                                 fontFamily:
+                                    Platform.OS === 'ios'
+                                       ? 'American Typewriter'
+                                       : Platform.OS === 'android'
+                                       ? 'monospace'
+                                       : 'Courier New',
+                              }}
+                           >
+                              Conversation recorded
+                           </Text>
+                        </View>
+                     )}
+                  </>
+               )}
+
+            {result && !result.ok && (
+               <View style={styles.resultBox}>
+                  <Text style={styles.resultTitle}>Processing failed</Text>
+                  <Text style={styles.resultText}>
+                     {JSON.stringify(result.data)}
+                  </Text>
+               </View>
+            )}
+         </ScrollView>
       </KeyboardAvoidingView>
    );
 }
 
-const baseMono = retroFonts.base;
-const headingFont = retroFonts.heading;
-
 const styles = StyleSheet.create({
    container: {
       flex: 1,
-   },
-   gradient: { flex: 1 },
-   window: {
-      flex: 1,
-      margin: 12,
-      borderRadius: 24,
-      borderWidth: 3,
-      marginTop: 46,
-      borderColor: retroPalette.outline,
-      backgroundColor: retroPalette.warmSand,
-      shadowColor: '#1b0f2c',
-      shadowOpacity: 0.32,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      overflow: 'hidden',
-   },
-   menuBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: retroPalette.menuGray,
-      paddingHorizontal: 18,
-      paddingTop: 10,
-      paddingBottom: 8,
-      borderBottomWidth: 2,
-      borderBottomColor: retroPalette.outline,
-   },
-   menuItem: {
-      marginRight: 18,
-      fontSize: 13,
-      color: retroPalette.menuText,
-      fontFamily: headingFont,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
-   },
-   menuLed: {
-      marginLeft: 'auto',
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: retroPalette.teal,
-      borderWidth: 1,
-      borderColor: retroPalette.outline,
-   },
-   windowBody: {
-      flex: 1,
+      backgroundColor: '#fff',
    },
    scrollContent: {
       flexGrow: 1,
+      justifyContent: 'center',
       alignItems: 'center',
-      padding: 20,
-      paddingBottom: 80,
+      padding: 16,
    },
    title: {
       fontSize: 24,
       fontWeight: 'bold',
       marginBottom: 20,
-      color: retroPalette.outline,
+      color: '#000',
       textAlign: 'center',
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    uploadBox: {
       width: '100%',
       borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 16,
-      padding: 16,
+      borderColor: '#000',
+      borderRadius: 10,
+      padding: 12,
       marginBottom: 12,
-      backgroundColor: '#fff4e2',
-      shadowColor: '#2c0d38',
-      shadowOpacity: 0.12,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
+      backgroundColor: '#fff',
    },
    selectButton: {
       width: '100%',
-      backgroundColor: '#f9d9ff',
+      backgroundColor: '#eee',
       paddingHorizontal: 16,
       paddingVertical: 14,
-      borderRadius: 12,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderRadius: 8,
       alignItems: 'center',
       marginBottom: 12,
    },
    selectButtonText: {
-      color: retroPalette.plum,
+      color: '#333',
       fontSize: 16,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    processButton: {
       width: '100%',
-      backgroundColor: retroPalette.coral,
+      backgroundColor: '#007AFF',
       paddingVertical: 14,
-      borderRadius: 12,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderRadius: 8,
       alignItems: 'center',
       marginTop: 8,
    },
@@ -838,32 +747,38 @@ const styles = StyleSheet.create({
       color: '#fff',
       fontSize: 16,
       fontWeight: '600',
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    resultBox: {
       marginTop: 16,
       width: '100%',
-      backgroundColor: '#fffbe2',
+      backgroundColor: '#f7f7f7',
       padding: 12,
-      borderRadius: 12,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderRadius: 8,
    },
    resultTitle: {
       fontWeight: '700',
       marginBottom: 8,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
    },
    resultText: {
       fontSize: 12,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
+      color: '#333',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    note: {
       marginTop: 16,
       fontSize: 12,
-      color: retroPalette.plum,
+      color: '#666',
       textAlign: 'center',
    },
    stepsContainer: {
@@ -874,17 +789,22 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 12,
-      backgroundColor: '#fff7e2',
-      padding: 10,
-      borderRadius: 12,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      backgroundColor: '#fff',
+      padding: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#000',
    },
    stepLabel: {
       fontSize: 13,
-      color: retroPalette.plum,
+      color: '#000',
       marginBottom: 6,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    stepStatus: {
       width: 48,
@@ -893,38 +813,36 @@ const styles = StyleSheet.create({
    },
    progressBar: {
       height: 8,
-      backgroundColor: '#fbe3ff',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: retroPalette.outline,
+      backgroundColor: '#eee',
+      borderRadius: 6,
       overflow: 'hidden',
    },
    progressFill: {
       height: 8,
-      backgroundColor: retroPalette.violet,
+      backgroundColor: '#000',
    },
    check: {
       fontSize: 16,
-      color: retroPalette.teal,
    },
    percent: {
       fontSize: 12,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
+      color: '#222',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    successCard: {
       marginTop: 24,
       width: '100%',
-      backgroundColor: '#fff5dd',
+      backgroundColor: '#fff',
       borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 18,
+      borderColor: '#000',
+      borderRadius: 12,
       padding: 16,
       alignItems: 'center',
-      shadowColor: '#2c0d38',
-      shadowOpacity: 0.12,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
    },
    cardContent: {
       flexDirection: 'row',
@@ -936,7 +854,7 @@ const styles = StyleSheet.create({
       height: 80,
       borderRadius: 40,
       borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderColor: '#000',
       marginRight: 12,
    },
    cardTextWrapper: {
@@ -945,24 +863,34 @@ const styles = StyleSheet.create({
    cardName: {
       fontSize: 18,
       fontWeight: 'bold',
-      color: retroPalette.outline,
+      color: '#000',
       marginBottom: 4,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    cardSubtext: {
       fontSize: 13,
-      color: retroPalette.violet,
-      fontFamily: baseMono,
+      color: '#666',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    editButton: {
       width: 40,
       height: 40,
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 10,
-      backgroundColor: '#fbe3ff',
+      borderWidth: 1,
+      borderColor: '#000',
+      borderRadius: 8,
+      backgroundColor: '#fff',
    },
    editIcon: {
       fontSize: 18,
@@ -973,24 +901,29 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 10,
-      backgroundColor: retroPalette.violet,
+      borderColor: '#000',
+      borderRadius: 8,
+      backgroundColor: '#000',
    },
    confirmIcon: {
       fontSize: 20,
-      color: retroPalette.warmSand,
+      color: '#fff',
       fontWeight: 'bold',
    },
    nameInput: {
       fontSize: 16,
-      color: retroPalette.plum,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 10,
+      color: '#000',
+      borderWidth: 1,
+      borderColor: '#000',
+      borderRadius: 6,
       paddingHorizontal: 8,
       paddingVertical: 6,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    reviewButton: {
       width: 70,
@@ -998,16 +931,21 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 10,
-      backgroundColor: '#fff0ff',
+      borderColor: '#000',
+      borderRadius: 8,
+      backgroundColor: '#fff',
       marginLeft: 8,
    },
    reviewText: {
       fontSize: 14,
-      color: retroPalette.plum,
+      color: '#000',
       fontWeight: '600',
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    confirmBlock: {
       marginTop: 4,
@@ -1015,15 +953,25 @@ const styles = StyleSheet.create({
    },
    confirmQuestion: {
       fontSize: 13,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
+      color: '#000',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    proposedName: {
       fontSize: 16,
       fontWeight: 'bold',
       marginTop: 2,
-      color: retroPalette.violet,
-      fontFamily: baseMono,
+      color: '#000',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    confirmButtonsRow: {
       flexDirection: 'row',
@@ -1035,17 +983,22 @@ const styles = StyleSheet.create({
       height: 40,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: retroPalette.teal,
-      borderRadius: 10,
+      backgroundColor: '#000',
+      borderRadius: 8,
       borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderColor: '#000',
       marginRight: 8,
    },
    yesText: {
       color: '#fff',
       fontWeight: '700',
       fontSize: 14,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    cancelButton: {
       paddingHorizontal: 14,
@@ -1053,15 +1006,20 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: '#fff',
-      borderRadius: 10,
+      borderRadius: 8,
       borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderColor: '#000',
    },
    cancelText: {
-      color: retroPalette.plum,
+      color: '#000',
       fontWeight: '600',
       fontSize: 14,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    confirmViewButton: {
       width: 90,
@@ -1069,32 +1027,42 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 10,
+      borderColor: '#000',
+      borderRadius: 8,
       backgroundColor: '#fff',
       marginLeft: 8,
    },
    confirmViewText: {
       fontSize: 14,
       fontWeight: '600',
-      color: retroPalette.plum,
-      fontFamily: baseMono,
+      color: '#000',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    keywordsBox: {
       marginTop: 16,
       width: '100%',
       borderWidth: 2,
-      borderColor: retroPalette.outline,
-      borderRadius: 14,
+      borderColor: '#000',
+      borderRadius: 10,
       padding: 12,
-      backgroundColor: '#fff7e2',
+      backgroundColor: '#fff',
    },
    keywordsTitle: {
       fontSize: 14,
       fontWeight: '700',
       marginBottom: 8,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
+      color: '#000',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    keywordsRow: {
       flexDirection: 'row',
@@ -1103,7 +1071,7 @@ const styles = StyleSheet.create({
    keywordPill: {
       paddingHorizontal: 10,
       paddingVertical: 6,
-      backgroundColor: retroPalette.violet,
+      backgroundColor: '#000',
       borderRadius: 20,
       marginRight: 8,
       marginBottom: 8,
@@ -1112,16 +1080,21 @@ const styles = StyleSheet.create({
       color: '#fff',
       fontSize: 12,
       fontWeight: '600',
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    confirmAcceptButton: {
       marginTop: 12,
       width: '100%',
-      backgroundColor: retroPalette.violet,
+      backgroundColor: '#000',
       paddingVertical: 14,
-      borderRadius: 14,
+      borderRadius: 10,
       borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderColor: '#000',
       alignItems: 'center',
       justifyContent: 'center',
    },
@@ -1130,16 +1103,21 @@ const styles = StyleSheet.create({
       fontSize: 14,
       fontWeight: '700',
       letterSpacing: 1,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    linkedinBox: {
       marginTop: 16,
       width: '100%',
       borderWidth: 2,
-      borderColor: retroPalette.teal,
-      borderRadius: 14,
+      borderColor: '#0077B5',
+      borderRadius: 10,
       padding: 12,
-      backgroundColor: '#e8fff8',
+      backgroundColor: '#fff',
    },
    linkedinContent: {
       flexDirection: 'row',
@@ -1149,21 +1127,32 @@ const styles = StyleSheet.create({
    linkedinIcon: {
       fontSize: 24,
       fontWeight: '700',
+      color: '#0077B5',
+      backgroundColor: '#0077B5',
       color: '#fff',
-      backgroundColor: retroPalette.teal,
       width: 32,
       height: 32,
       lineHeight: 32,
       textAlign: 'center',
       borderRadius: 4,
       marginRight: 12,
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    linkedinText: {
       fontSize: 14,
       fontWeight: '600',
-      color: retroPalette.teal,
-      fontFamily: baseMono,
+      color: '#0077B5',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    linkedinWrapper: {
       marginTop: 16,
@@ -1174,16 +1163,26 @@ const styles = StyleSheet.create({
       fontSize: 10,
       fontWeight: '700',
       letterSpacing: 1,
-      color: retroPalette.teal,
+      color: '#0077B5',
       marginBottom: 6,
       textTransform: 'uppercase',
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    linkedinUrlText: {
       marginTop: 8,
       fontSize: 12,
-      color: retroPalette.plum,
+      color: '#333',
       textAlign: 'center',
-      fontFamily: baseMono,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
 });

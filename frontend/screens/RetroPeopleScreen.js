@@ -15,10 +15,12 @@ import {
    Animated,
    Easing,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { BASE_URL } from '../config';
+import { retroFonts, retroPalette, retroMenuItems } from '../styles/retroTheme';
 
-export default function PeopleScreen({ onOpenConversation }) {
+export default function RetroPeopleScreen({ onOpenConversation }) {
    const [people, setPeople] = useState([]);
    const [assistantInput, setAssistantInput] = useState('');
    const [latestInteraction, setLatestInteraction] = useState(null);
@@ -146,54 +148,72 @@ export default function PeopleScreen({ onOpenConversation }) {
    };
 
    return (
-      <View style={styles.screen}>
-         <ScrollView
-            contentContainerStyle={styles.container}
-            keyboardShouldPersistTaps='handled'
-         >
-            <Text style={styles.header}>People You’ve Talked To</Text>
-            {people.map((person, index) => (
-               <View key={index} style={styles.card}>
-                  <Image
-                     source={{ uri: person.image_url }}
-                     style={styles.image}
-                  />
-                  <View style={styles.nameContainer}>
-                     <Text style={styles.name}>{person.name || 'Unknown'}</Text>
-                     {person.headline ? (
-                        <Text style={styles.headline}>{person.headline}</Text>
-                     ) : null}
-                  </View>
-
-                  <TouchableOpacity
-                     style={styles.sign}
-                     onPress={() =>
-                        onOpenConversation
-                           ? onOpenConversation({
-                                name: person.name,
-                                avatarUrl: person.image_url,
-                                headline: person.headline,
-                             })
-                           : console.log('Open chat with', person.name)
-                     }
-                  >
-                     <Text style={styles.signText}>➜</Text>
-                  </TouchableOpacity>
-               </View>
-            ))}
-         </ScrollView>
-         <View style={styles.composerTriggerShell}>
-            <TouchableOpacity
-               style={styles.composerTrigger}
-               activeOpacity={0.9}
-               onPress={() => setAssistantModalVisible(true)}
-            >
-               <Text style={styles.composerTriggerText}>
-                  {latestInteraction?.question
-                     ? `You: ${latestInteraction.question}`
-                     : 'Ask everyone anything...'}
-               </Text>
-            </TouchableOpacity>
+      <LinearGradient
+         colors={[retroPalette.sunsetStart, retroPalette.sunsetEnd]}
+         style={styles.gradient}
+      >
+         <View style={styles.window}>
+            <View style={styles.menuBar}>
+               {retroMenuItems.map((item) => (
+                  <Text key={item} style={styles.menuItem}>
+                     {item}
+                  </Text>
+               ))}
+               <View style={styles.menuLed} />
+            </View>
+            <View style={styles.windowBody}>
+               <ScrollView
+                  contentContainerStyle={styles.container}
+                  keyboardShouldPersistTaps='handled'
+               >
+                  <Text style={styles.header}>People You’ve Talked To</Text>
+                  {people.map((person, index) => (
+                     <View key={index} style={styles.card}>
+                        <Image
+                           source={{ uri: person.image_url }}
+                           style={styles.image}
+                        />
+                        <View style={styles.nameContainer}>
+                           <Text style={styles.name}>
+                              {person.name || 'Unknown'}
+                           </Text>
+                           {person.headline ? (
+                              <Text style={styles.headline}>
+                                 {person.headline}
+                              </Text>
+                           ) : null}
+                        </View>
+                        <TouchableOpacity
+                           style={styles.sign}
+                           onPress={() =>
+                              onOpenConversation
+                                 ? onOpenConversation({
+                                      name: person.name,
+                                      avatarUrl: person.image_url,
+                                      headline: person.headline,
+                                   })
+                                 : console.log('Open chat with', person.name)
+                           }
+                        >
+                           <Text style={styles.signText}>➜</Text>
+                        </TouchableOpacity>
+                     </View>
+                  ))}
+               </ScrollView>
+            </View>
+            <View style={styles.composerTriggerShell}>
+               <TouchableOpacity
+                  style={styles.composerTrigger}
+                  activeOpacity={0.9}
+                  onPress={() => setAssistantModalVisible(true)}
+               >
+                  <Text style={styles.composerTriggerText}>
+                     {latestInteraction?.question
+                        ? `You: ${latestInteraction.question}`
+                        : 'Ask everyone anything...'}
+                  </Text>
+               </TouchableOpacity>
+            </View>
          </View>
 
          <Modal
@@ -363,7 +383,10 @@ export default function PeopleScreen({ onOpenConversation }) {
                            disabled={assistantLoading}
                         >
                            {assistantLoading ? (
-                              <ActivityIndicator color='#000' size='small' />
+                              <ActivityIndicator
+                                 color={retroPalette.warmSand}
+                                 size='small'
+                              />
                            ) : (
                               <Text style={styles.assistantButtonText}>
                                  Send
@@ -375,27 +398,70 @@ export default function PeopleScreen({ onOpenConversation }) {
                </View>
             </View>
          </Modal>
-      </View>
+      </LinearGradient>
    );
 }
 
 const styles = StyleSheet.create({
-   screen: { flex: 1, backgroundColor: '#fff' },
+   gradient: { flex: 1 },
+   window: {
+      flex: 1,
+      margin: 12,
+      borderRadius: 24,
+      marginTop: 46,
+      borderWidth: 3,
+      borderColor: retroPalette.outline,
+      backgroundColor: retroPalette.warmSand,
+      shadowColor: '#1b0f2c',
+      shadowOpacity: 0.32,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      overflow: 'hidden',
+   },
+   menuBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: retroPalette.menuGray,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+      paddingBottom: 8,
+      borderBottomWidth: 2,
+      borderBottomColor: retroPalette.outline,
+   },
+   menuItem: {
+      marginRight: 18,
+      fontSize: 13,
+      color: retroPalette.menuText,
+      fontFamily: retroFonts.heading,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+   },
+   menuLed: {
+      marginLeft: 'auto',
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: retroPalette.teal,
+      borderWidth: 1,
+      borderColor: retroPalette.outline,
+   },
+   windowBody: {
+      flex: 1,
+      paddingBottom: 120,
+   },
    container: {
       padding: 16,
-      marginTop: 36,
-      paddingBottom: 140,
-      backgroundColor: '#fff',
+      paddingBottom: 160,
    },
    assistantButton: {
       minWidth: 64,
       height: 40,
-      borderWidth: 1,
-      borderColor: '#000',
-      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: retroPalette.violet,
       marginLeft: 12,
    },
    assistantButtonDisabled: {
@@ -404,68 +470,77 @@ const styles = StyleSheet.create({
    assistantButtonText: {
       fontSize: 16,
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.warmSand,
+      fontFamily: retroFonts.base,
    },
    assistantPlaceholder: {
       fontSize: 14,
-      color: '#666',
+      color: retroPalette.plum,
       marginBottom: 12,
+      fontFamily: retroFonts.base,
    },
    assistantError: {
-      color: '#c00',
+      color: retroPalette.coral,
       fontSize: 14,
       marginBottom: 8,
+      fontFamily: retroFonts.base,
    },
    assistantResponse: {
-      borderTopWidth: 1,
-      borderTopColor: '#eee',
+      borderTopWidth: 2,
+      borderTopColor: retroPalette.outline,
       paddingTop: 12,
       marginTop: 12,
    },
    assistantLabel: {
       fontSize: 13,
       fontWeight: '600',
-      color: '#444',
+      color: retroPalette.plum,
+      fontFamily: retroFonts.base,
    },
    assistantQuestion: {
       fontSize: 16,
-      color: '#000',
+      color: retroPalette.plum,
       marginBottom: 6,
+      fontFamily: retroFonts.base,
    },
    assistantAnswer: {
       fontSize: 16,
       fontStyle: 'italic',
-      color: '#222',
+      color: retroPalette.violet,
       marginBottom: 6,
+      fontFamily: retroFonts.base,
    },
    assistantSuggestion: {
       fontSize: 14,
-      color: '#555',
+      color: retroPalette.plum,
       marginBottom: 8,
+      fontFamily: retroFonts.base,
    },
    assistantExcerpt: {
       marginBottom: 6,
       paddingVertical: 6,
       paddingHorizontal: 8,
-      borderWidth: 1,
-      borderColor: '#e5e5e5',
-      borderRadius: 6,
-      backgroundColor: '#fafafa',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 8,
+      backgroundColor: '#fff7e2',
    },
    assistantExcerptLine: {
       fontSize: 15,
-      color: '#111',
+      color: retroPalette.plum,
       marginBottom: 4,
+      fontFamily: retroFonts.base,
    },
    assistantExcerptHighlight: {
-      backgroundColor: '#fff6cc',
+      backgroundColor: '#ffeaa0',
       borderRadius: 4,
       paddingHorizontal: 4,
       paddingVertical: 2,
    },
    assistantExcerptSpeaker: {
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.violet,
+      fontFamily: retroFonts.base,
    },
    assistantLink: {
       alignSelf: 'flex-start',
@@ -480,13 +555,14 @@ const styles = StyleSheet.create({
       width: 32,
       height: 32,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: '#ddd',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    assistantLinkText: {
-      color: '#0072ff',
+      color: retroPalette.teal,
       fontSize: 15,
       fontWeight: '600',
+      fontFamily: retroFonts.heading,
    },
    composerTriggerShell: {
       position: 'absolute',
@@ -497,24 +573,22 @@ const styles = StyleSheet.create({
       paddingBottom: Platform.OS === 'ios' ? 30 : 20,
    },
    composerTrigger: {
-      borderWidth: 1,
-      borderColor: '#d9d9d9',
-      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 22,
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor:
-         Platform.OS === 'ios'
-            ? 'rgba(255,255,255,0.9)'
-            : 'rgba(255,255,255,0.98)',
-      shadowColor: '#000',
-      shadowOpacity: 0.08,
+      backgroundColor: '#f5d0ff',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 4 },
       elevation: 6,
    },
    composerTriggerText: {
       fontSize: 16,
-      color: '#333',
+      color: retroPalette.plum,
+      fontFamily: retroFonts.base,
    },
    modalOverlay: {
       flex: 1,
@@ -527,12 +601,11 @@ const styles = StyleSheet.create({
    modalCard: {
       flex: 1,
       marginTop: 80,
-      backgroundColor:
-         Platform.OS === 'ios'
-            ? 'rgba(255,255,255,0.9)'
-            : 'rgba(255,255,255,0.97)',
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      backgroundColor: retroPalette.warmSand,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
       overflow: 'hidden',
    },
    modalHeader: {
@@ -541,13 +614,15 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       paddingTop: 16,
       paddingBottom: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
+      borderBottomWidth: 2,
+      borderBottomColor: retroPalette.outline,
+      backgroundColor: retroPalette.menuGray,
    },
    modalTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.menuText,
+      fontFamily: retroFonts.heading,
    },
    modalClose: {
       position: 'absolute',
@@ -557,11 +632,13 @@ const styles = StyleSheet.create({
    },
    modalCloseText: {
       fontSize: 18,
-      color: '#000',
+      color: retroPalette.menuText,
       fontWeight: '700',
    },
    modalError: {
       paddingHorizontal: 16,
+      color: retroPalette.coral,
+      fontFamily: retroFonts.base,
    },
    modalContent: {
       flex: 1,
@@ -577,17 +654,14 @@ const styles = StyleSheet.create({
       marginHorizontal: 16,
       flexDirection: 'row',
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: '#d9d9d9',
-      borderRadius: 18,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 20,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      backgroundColor:
-         Platform.OS === 'ios'
-            ? 'rgba(255,255,255,0.92)'
-            : 'rgba(255,255,255,0.97)',
-      shadowColor: '#000',
-      shadowOpacity: 0.12,
+      backgroundColor: '#fce9ff',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 4 },
       elevation: 6,
@@ -595,43 +669,40 @@ const styles = StyleSheet.create({
    modalInput: {
       flex: 1,
       fontSize: 16,
-      color: '#000',
+      color: retroPalette.plum,
+      fontFamily: retroFonts.base,
       paddingVertical: Platform.OS === 'ios' ? 10 : 6,
       paddingRight: 8,
    },
    header: {
-      fontSize: 24,
+      fontSize: 26,
       fontWeight: '700',
-      marginVertical: 12,
-      color: '#000',
+      marginVertical: 16,
+      color: retroPalette.outline,
       textAlign: 'center',
-      fontFamily:
-         Platform.OS === 'ios'
-            ? 'American Typewriter'
-            : Platform.OS === 'android'
-            ? 'monospace'
-            : 'Courier New',
+      fontFamily: retroFonts.heading,
+      textTransform: 'uppercase',
    },
    card: {
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 12,
       padding: 12,
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#000',
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 4,
-      elevation: 2,
+      backgroundColor: '#fff5dd',
+      borderRadius: 18,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 4,
    },
    image: {
       width: 72,
       height: 72,
       borderRadius: 36,
-      borderWidth: 1,
-      borderColor: '#000',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    nameContainer: {
       flex: 1,
@@ -641,41 +712,31 @@ const styles = StyleSheet.create({
    name: {
       fontSize: 18,
       fontWeight: '700',
-      color: '#000',
-      fontFamily:
-         Platform.OS === 'ios'
-            ? 'American Typewriter'
-            : Platform.OS === 'android'
-            ? 'monospace'
-            : 'Courier New',
+      color: retroPalette.plum,
+      fontFamily: retroFonts.heading,
       textTransform: 'uppercase',
    },
    headline: {
       fontSize: 13,
       fontWeight: '400',
-      color: '#666',
+      color: retroPalette.violet,
       marginTop: 2,
-      fontFamily:
-         Platform.OS === 'ios'
-            ? 'American Typewriter'
-            : Platform.OS === 'android'
-            ? 'monospace'
-            : 'Courier New',
+      fontFamily: retroFonts.base,
    },
    sign: {
       marginLeft: 12,
       width: 36,
       height: 28,
-      borderWidth: 1,
-      borderColor: '#000',
-      borderRadius: 4,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      borderRadius: 6,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#fff',
+      backgroundColor: '#f4c9ff',
    },
    signText: {
       fontSize: 18,
       fontWeight: '700',
-      color: '#000',
+      color: retroPalette.outline,
    },
 });

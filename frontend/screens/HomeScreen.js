@@ -13,7 +13,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { BASE_URL } from '../config';
-import { retroFonts, retroPalette, retroMenuItems } from '../styles/retroTheme';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -302,336 +301,263 @@ export default function HomeScreen({ onOpenConversation, onNavigateTab }) {
    ];
 
    return (
-      <LinearGradient
-         colors={[retroPalette.sunsetStart, retroPalette.sunsetEnd]}
-         style={styles.gradient}
-      >
-         <View style={styles.window}>
-            <View style={styles.menuBar}>
-               {retroMenuItems.map((item) => (
-                  <Text key={item} style={styles.menuItem}>
-                     {item}
-                  </Text>
-               ))}
-               <View style={styles.menuLed} />
-            </View>
-            <ScrollView
-               style={styles.windowBody}
-               contentContainerStyle={styles.scrollContent}
-               showsVerticalScrollIndicator={false}
+      <View style={styles.screen}>
+         <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+         >
+            <LinearGradient
+               colors={['#0f172a', '#1d4ed8']}
+               start={{ x: 0, y: 0 }}
+               end={{ x: 1, y: 1 }}
+               style={styles.heroCard}
             >
-               <View style={styles.heroCard}>
-                  <Text style={styles.heroEyebrow}>Command Center</Text>
-                  <Text style={styles.heroTitle}>Welcome back</Text>
-                  <Text style={styles.heroCopy}>
-                     Review your orbit, follow up on upcoming highlights, and
-                     keep every memory organized.
-                  </Text>
-                  <View style={styles.heroStatsRow}>
-                     {heroStats.map((stat) => (
-                        <View key={stat.label} style={styles.heroStat}>
-                           <Text style={styles.heroStatValue}>
-                              {stat.value.toLocaleString()}
+               <Text style={styles.heroEyebrow}>Command Center</Text>
+               <Text style={styles.heroTitle}>Welcome back</Text>
+               <Text style={styles.heroCopy}>
+                  Review your orbit, follow up on upcoming highlights, and keep
+                  every memory organized.
+               </Text>
+               <View style={styles.heroStatsRow}>
+                  {heroStats.map((stat) => (
+                     <View key={stat.label} style={styles.heroStat}>
+                        <Text style={styles.heroStatValue}>
+                           {stat.value.toLocaleString()}
+                        </Text>
+                        <Text style={styles.heroStatLabel}>{stat.label}</Text>
+                     </View>
+                  ))}
+               </View>
+            </LinearGradient>
+
+            <View style={styles.sectionCard}>
+               <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Quick Actions</Text>
+               </View>
+               <View style={styles.quickActions}>
+                  {quickActions.map((action) => (
+                     <TouchableOpacity
+                        key={action.label}
+                        style={styles.quickActionCard}
+                        activeOpacity={0.9}
+                        onPress={action.onPress}
+                     >
+                        <Text style={styles.quickActionIcon}>
+                           {action.icon}
+                        </Text>
+                        <View style={styles.quickActionCopy}>
+                           <Text style={styles.quickActionLabel}>
+                              {action.label}
                            </Text>
-                           <Text style={styles.heroStatLabel}>
-                              {stat.label}
+                           <Text style={styles.quickActionDescription}>
+                              {action.description}
                            </Text>
                         </View>
-                     ))}
-                  </View>
+                     </TouchableOpacity>
+                  ))}
                </View>
+            </View>
 
-               <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeader}>
-                     <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.sectionCard}>
+               <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Highlights Preview</Text>
+                  <TouchableOpacity
+                     activeOpacity={0.8}
+                     onPress={() => onNavigateTab?.('highlights')}
+                  >
+                     <Text style={styles.sectionLink}>View all</Text>
+                  </TouchableOpacity>
+               </View>
+               {highlightsLoading ? (
+                  <View style={styles.sectionLoading}>
+                     <ActivityIndicator size='small' color='#007AFF' />
+                     <Text style={styles.sectionLoadingText}>
+                        Scanning highlights…
+                     </Text>
                   </View>
-                  <View style={styles.quickActions}>
-                     {quickActions.map((action) => (
-                        <TouchableOpacity
-                           key={action.label}
-                           style={styles.quickActionCard}
-                           activeOpacity={0.9}
-                           onPress={action.onPress}
-                        >
-                           <Text style={styles.quickActionIcon}>
-                              {action.icon}
-                           </Text>
-                           <View style={styles.quickActionCopy}>
-                              <Text style={styles.quickActionLabel}>
-                                 {action.label}
+               ) : highlightsError ? (
+                  <Text style={styles.sectionEmpty}>{highlightsError}</Text>
+               ) : highlightsPreview.length === 0 ? (
+                  <Text style={styles.sectionEmpty}>
+                     No highlights queued right now.
+                  </Text>
+               ) : (
+                  highlightsPreview.map((item) => (
+                     <TouchableOpacity
+                        key={`${item.id}-${item.person_name}`}
+                        style={styles.highlightPreviewCard}
+                        activeOpacity={0.9}
+                        onPress={() =>
+                           onOpenConversation?.({
+                              name: item.person_name,
+                              headline: item.person_headline,
+                           })
+                        }
+                     >
+                        <View style={styles.highlightHeader}>
+                           <View>
+                              <Text style={styles.highlightName}>
+                                 {item.person_name || 'Unknown'}
                               </Text>
-                              <Text style={styles.quickActionDescription}>
-                                 {action.description}
+                              <Text style={styles.highlightMeta}>
+                                 {formatEventDate(item.event_date)}
+                                 {item.category ? ` · ${item.category}` : ''}
                               </Text>
                            </View>
-                        </TouchableOpacity>
-                     ))}
-                  </View>
-               </View>
-
-               <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeader}>
-                     <Text style={styles.sectionTitle}>Highlights Preview</Text>
-                     <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => onNavigateTab?.('highlights')}
-                     >
-                        <Text style={styles.sectionLink}>View all</Text>
-                     </TouchableOpacity>
-                  </View>
-                  {highlightsLoading ? (
-                     <View style={styles.sectionLoading}>
-                        <ActivityIndicator
-                           size='small'
-                           color={retroPalette.violet}
-                        />
-                        <Text style={styles.sectionLoadingText}>
-                           Scanning highlights…
-                        </Text>
-                     </View>
-                  ) : highlightsError ? (
-                     <Text style={styles.sectionEmpty}>{highlightsError}</Text>
-                  ) : highlightsPreview.length === 0 ? (
-                     <Text style={styles.sectionEmpty}>
-                        No highlights queued right now.
-                     </Text>
-                  ) : (
-                     highlightsPreview.map((item) => (
-                        <TouchableOpacity
-                           key={`${item.id}-${item.person_name}`}
-                           style={styles.highlightPreviewCard}
-                           activeOpacity={0.9}
-                           onPress={() =>
-                              onOpenConversation?.({
-                                 name: item.person_name,
-                                 headline: item.person_headline,
-                              })
-                           }
-                        >
-                           <View style={styles.highlightHeader}>
-                              <View>
-                                 <Text style={styles.highlightName}>
-                                    {item.person_name || 'Unknown'}
-                                 </Text>
-                                 <Text style={styles.highlightMeta}>
-                                    {formatEventDate(item.event_date)}
-                                    {item.category ? ` · ${item.category}` : ''}
+                           {formatCountdown(
+                              item.event_timestamp,
+                              item.event_date
+                           ) ? (
+                              <View style={styles.countdownPill}>
+                                 <Text style={styles.countdownText}>
+                                    {formatCountdown(
+                                       item.event_timestamp,
+                                       item.event_date
+                                    )}
                                  </Text>
                               </View>
-                              {formatCountdown(
-                                 item.event_timestamp,
-                                 item.event_date
-                              ) ? (
-                                 <View style={styles.countdownPill}>
-                                    <Text style={styles.countdownText}>
-                                       {formatCountdown(
-                                          item.event_timestamp,
-                                          item.event_date
-                                       )}
-                                    </Text>
-                                 </View>
-                              ) : null}
-                           </View>
-                           <Text style={styles.highlightSummary}>
-                              {item.summary || item.description}
-                           </Text>
-                        </TouchableOpacity>
-                     ))
-                  )}
-               </View>
-
-               <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeader}>
-                     <Text style={styles.sectionTitle}>Orbit Radar</Text>
-                  </View>
-                  {loading ? (
-                     <View style={styles.sectionLoading}>
-                        <ActivityIndicator
-                           size='large'
-                           color={retroPalette.violet}
-                        />
-                        <Text style={styles.sectionLoadingText}>
-                           Mapping your people…
+                           ) : null}
+                        </View>
+                        <Text style={styles.highlightSummary}>
+                           {item.summary || item.description}
                         </Text>
-                     </View>
-                  ) : error ? (
-                     <Text style={styles.sectionEmpty}>{error}</Text>
-                  ) : preparedNodes.length === 0 ? (
-                     <Text style={styles.sectionEmpty}>
-                        Upload a video to enroll someone and start building the
-                        network.
+                     </TouchableOpacity>
+                  ))
+               )}
+            </View>
+
+            <View style={styles.sectionCard}>
+               <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Orbit Radar</Text>
+               </View>
+               {loading ? (
+                  <View style={styles.sectionLoading}>
+                     <ActivityIndicator size='large' color='#007AFF' />
+                     <Text style={styles.sectionLoadingText}>
+                        Mapping your people…
                      </Text>
-                  ) : (
-                     <>
-                        <View
-                           style={[
-                              styles.graphWrapper,
-                              { height: graphHeight },
-                           ]}
-                        >
-                           {preparedNodes.map((node) => (
-                              <View
-                                 key={node.name}
+                  </View>
+               ) : error ? (
+                  <Text style={styles.sectionEmpty}>{error}</Text>
+               ) : preparedNodes.length === 0 ? (
+                  <Text style={styles.sectionEmpty}>
+                     Upload a video to enroll someone and start building the
+                     network.
+                  </Text>
+               ) : (
+                  <>
+                     <View
+                        style={[styles.graphWrapper, { height: graphHeight }]}
+                     >
+                        {preparedNodes.map((node) => (
+                           <View
+                              key={node.name}
+                              style={[
+                                 styles.nodeWrapper,
+                                 {
+                                    left: node.x - node.size / 2,
+                                    top: node.y - node.size / 2,
+                                    width: node.size,
+                                    height: node.size,
+                                 },
+                              ]}
+                           >
+                              <TouchableOpacity
+                                 activeOpacity={0.85}
+                                 onPress={() => {
+                                    if (!onOpenConversation || !node?.name) {
+                                       return;
+                                    }
+                                    onOpenConversation({
+                                       name: node.name,
+                                       avatarUrl: node.image_url,
+                                       headline: node.headline,
+                                    });
+                                 }}
                                  style={[
-                                    styles.nodeWrapper,
+                                    styles.nodeTouchable,
                                     {
-                                       left: node.x - node.size / 2,
-                                       top: node.y - node.size / 2,
-                                       width: node.size,
-                                       height: node.size,
+                                       borderRadius: node.size / 2,
                                     },
                                  ]}
                               >
-                                 <TouchableOpacity
-                                    activeOpacity={0.85}
-                                    onPress={() => {
-                                       if (!onOpenConversation || !node?.name) {
-                                          return;
-                                       }
-                                       onOpenConversation({
-                                          name: node.name,
-                                          avatarUrl: node.image_url,
-                                          headline: node.headline,
-                                       });
-                                    }}
-                                    style={[
-                                       styles.nodeTouchable,
-                                       {
-                                          borderRadius: node.size / 2,
-                                       },
-                                    ]}
-                                 >
-                                    {node.image_url ? (
-                                       <Image
-                                          source={{ uri: node.image_url }}
-                                          style={styles.nodeImage}
-                                       />
-                                    ) : (
-                                       <View style={styles.nodeFallback}>
-                                          <Text style={styles.nodeFallbackText}>
-                                             {node.name?.[0]?.toUpperCase() ||
-                                                '?'}
-                                          </Text>
-                                       </View>
-                                    )}
-                                 </TouchableOpacity>
-                                 <View style={styles.nodeLabel}>
-                                    <Text style={styles.nodeName}>
-                                       {node.name || 'Unknown'}
-                                    </Text>
-                                    <Text style={styles.nodeMeta}>
-                                       {node.share
-                                          ? `${node.share}% of memories`
-                                          : '0% of memories'}
-                                    </Text>
-                                 </View>
+                                 {node.image_url ? (
+                                    <Image
+                                       source={{ uri: node.image_url }}
+                                       style={styles.nodeImage}
+                                    />
+                                 ) : (
+                                    <View style={styles.nodeFallback}>
+                                       <Text style={styles.nodeFallbackText}>
+                                          {node.name?.[0]?.toUpperCase() || '?'}
+                                       </Text>
+                                    </View>
+                                 )}
+                              </TouchableOpacity>
+                              <View style={styles.nodeLabel}>
+                                 <Text style={styles.nodeName}>
+                                    {node.name || 'Unknown'}
+                                 </Text>
+                                 <Text style={styles.nodeMeta}>
+                                    {node.share
+                                       ? `${node.share}% of memories`
+                                       : '0% of memories'}
+                                 </Text>
                               </View>
-                           ))}
-                        </View>
-                        <View style={styles.legend}>
-                           <View style={styles.legendDot} />
-                           <Text style={styles.legendText}>
-                              Tap a face to jump into their latest conversation.
-                           </Text>
-                        </View>
-                     </>
-                  )}
-               </View>
-            </ScrollView>
-         </View>
-      </LinearGradient>
+                           </View>
+                        ))}
+                     </View>
+                     <View style={styles.legend}>
+                        <View style={styles.legendDot} />
+                        <Text style={styles.legendText}>
+                           Tap a face to jump into their latest conversation.
+                        </Text>
+                     </View>
+                  </>
+               )}
+            </View>
+         </ScrollView>
+      </View>
    );
 }
 
-const baseMono = retroFonts.base;
-const headingFont = retroFonts.heading;
-
 const styles = StyleSheet.create({
-   gradient: { flex: 1 },
-   window: {
+   screen: {
       flex: 1,
-      margin: 12,
-      borderRadius: 24,
-      borderWidth: 3,
-      marginTop: 46,
-      borderColor: retroPalette.outline,
-      backgroundColor: retroPalette.warmSand,
-      shadowColor: '#1b0f2c',
-      shadowOpacity: 0.35,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      overflow: 'hidden',
-   },
-   menuBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: retroPalette.menuGray,
-      paddingHorizontal: 18,
-      paddingTop: 10,
-      paddingBottom: 8,
-      borderBottomWidth: 2,
-      borderBottomColor: retroPalette.outline,
-   },
-   menuItem: {
-      marginRight: 18,
-      fontSize: 13,
-      color: retroPalette.menuText,
-      fontFamily: headingFont,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
-   },
-   menuLed: {
-      marginLeft: 'auto',
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: retroPalette.teal,
-      borderWidth: 1,
-      borderColor: retroPalette.outline,
-   },
-   windowBody: {
-      flex: 1,
-      backgroundColor: 'transparent',
+      backgroundColor: '#f4f6fb',
    },
    scrollContent: {
       paddingHorizontal: 20,
-      paddingTop: 24,
+      paddingTop: 70,
       paddingBottom: 32,
-      gap: 18,
    },
    heroCard: {
       borderRadius: 28,
       padding: 24,
-      marginBottom: 12,
-      borderWidth: 3,
-      borderColor: retroPalette.outline,
-      backgroundColor: '#fff0f5',
-      shadowColor: '#2c0d38',
-      shadowOpacity: 0.18,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
+      marginBottom: 18,
+      shadowColor: '#0f172a',
+      shadowOpacity: 0.35,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 16 },
+      elevation: 6,
    },
    heroEyebrow: {
       fontSize: 13,
-      color: retroPalette.violet,
+      color: '#a5b4fc',
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       marginBottom: 6,
-      fontFamily: baseMono,
    },
    heroTitle: {
       fontSize: 30,
-      color: retroPalette.outline,
+      color: '#fff',
       fontWeight: '700',
-      marginBottom: 8,
-      fontFamily: headingFont,
-      textTransform: 'uppercase',
+      marginBottom: 4,
    },
    heroCopy: {
-      color: retroPalette.plum,
-      fontSize: 15,
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: 16,
       lineHeight: 22,
-      fontFamily: baseMono,
    },
    heroStatsRow: {
       flexDirection: 'row',
@@ -643,41 +569,39 @@ const styles = StyleSheet.create({
    heroStat: {
       flexBasis: '30%',
       flexGrow: 1,
-      backgroundColor: '#fbe9ff',
+      backgroundColor: 'rgba(15,23,42,0.35)',
       borderRadius: 18,
       paddingVertical: 12,
       paddingHorizontal: 14,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
       minWidth: 110,
    },
    heroStatValue: {
       fontSize: 22,
       fontWeight: '700',
-      color: retroPalette.outline,
+      color: '#fff',
       textAlign: 'center',
-      fontFamily: headingFont,
    },
    heroStatLabel: {
       fontSize: 12,
-      color: retroPalette.violet,
+      color: 'rgba(255,255,255,0.7)',
       marginTop: 4,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
       flexWrap: 'wrap',
       textAlign: 'center',
-      fontFamily: baseMono,
    },
    sectionCard: {
-      backgroundColor: '#fff5dd',
+      backgroundColor: '#fff',
       borderRadius: 24,
       padding: 20,
-      borderWidth: 3,
-      borderColor: retroPalette.outline,
-      shadowColor: '#1b0f2c',
-      shadowOpacity: 0.1,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
+      marginBottom: 18,
+      shadowColor: '#0f172a',
+      shadowOpacity: 0.05,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 3,
    },
    sectionHeader: {
       flexDirection: 'row',
@@ -688,30 +612,24 @@ const styles = StyleSheet.create({
    sectionTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: retroPalette.outline,
-      fontFamily: headingFont,
+      color: '#0f172a',
    },
    sectionLink: {
       fontSize: 14,
       fontWeight: '600',
-      color: retroPalette.teal,
-      fontFamily: baseMono,
+      color: '#2563eb',
    },
    quickActions: {
       gap: 12,
    },
    quickActionCard: {
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
       borderRadius: 18,
       padding: 14,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#fdf1ff',
-      shadowColor: '#1b0f2c',
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 3 },
+      backgroundColor: '#f9fafb',
    },
    quickActionIcon: {
       fontSize: 22,
@@ -723,14 +641,16 @@ const styles = StyleSheet.create({
    quickActionLabel: {
       fontSize: 16,
       fontWeight: '600',
-      color: retroPalette.outline,
-      fontFamily: headingFont,
+      color: '#111827',
    },
    quickActionDescription: {
       fontSize: 13,
-      color: retroPalette.plum,
+      color: '#475569',
       marginTop: 2,
-      fontFamily: baseMono,
+   },
+   sectionEmpty: {
+      fontSize: 15,
+      color: '#6b7280',
    },
    sectionLoading: {
       flexDirection: 'row',
@@ -739,21 +659,15 @@ const styles = StyleSheet.create({
    },
    sectionLoadingText: {
       fontSize: 14,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
-   },
-   sectionEmpty: {
-      fontSize: 14,
-      color: retroPalette.plum,
-      fontFamily: baseMono,
+      color: '#475569',
    },
    highlightPreviewCard: {
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
       borderRadius: 16,
       padding: 14,
       marginBottom: 12,
-      backgroundColor: '#fffdf0',
+      backgroundColor: '#f9fafb',
    },
    highlightHeader: {
       flexDirection: 'row',
@@ -764,47 +678,37 @@ const styles = StyleSheet.create({
    highlightName: {
       fontSize: 16,
       fontWeight: '600',
-      color: retroPalette.outline,
-      fontFamily: headingFont,
+      color: '#0f172a',
    },
    highlightMeta: {
       fontSize: 13,
-      color: retroPalette.violet,
+      color: '#6b7280',
       marginTop: 2,
-      fontFamily: baseMono,
    },
    highlightSummary: {
       fontSize: 14,
-      color: retroPalette.plum,
+      color: '#111827',
       lineHeight: 20,
-      fontFamily: baseMono,
    },
    countdownPill: {
       borderRadius: 999,
-      backgroundColor: '#fef1bc',
+      backgroundColor: '#eef2ff',
       paddingHorizontal: 12,
       paddingVertical: 4,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
    },
    countdownText: {
       fontSize: 12,
       fontWeight: '600',
-      color: retroPalette.outline,
+      color: '#4338ca',
       textTransform: 'uppercase',
-      fontFamily: baseMono,
    },
    graphWrapper: {
       marginTop: 24,
-      borderRadius: 28,
-      backgroundColor: '#fff5dd',
-      borderWidth: 3,
-      borderColor: retroPalette.outline,
+      borderRadius: 24,
+      backgroundColor: '#fff',
+      borderWidth: 1,
+      borderColor: '#e4e7ec',
       overflow: 'hidden',
-      shadowColor: '#2c0d38',
-      shadowOpacity: 0.12,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
    },
    nodeWrapper: {
       position: 'absolute',
@@ -815,12 +719,12 @@ const styles = StyleSheet.create({
       height: '100%',
       overflow: 'hidden',
       borderWidth: 3,
-      borderColor: retroPalette.outline,
-      backgroundColor: '#f5d0ff',
-      shadowColor: '#2c0d38',
+      borderColor: '#fff',
+      backgroundColor: '#d9e2ec',
+      shadowColor: '#000',
       shadowOpacity: 0.2,
       shadowOffset: { width: 0, height: 6 },
-      shadowRadius: 8,
+      shadowRadius: 6,
       elevation: 6,
    },
    nodeImage: {
@@ -831,56 +735,47 @@ const styles = StyleSheet.create({
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: retroPalette.lilac,
+      backgroundColor: '#c7d2fe',
    },
    nodeFallbackText: {
       fontSize: 42,
-      color: retroPalette.outline,
+      color: '#1d1d1f',
       fontWeight: '700',
-      fontFamily: headingFont,
    },
    nodeLabel: {
       marginTop: 8,
       alignItems: 'center',
-      paddingHorizontal: 6,
-      backgroundColor: '#fff3f9',
-      borderRadius: 12,
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
    },
    nodeName: {
       fontSize: 16,
       fontWeight: '700',
-      color: retroPalette.outline,
+      color: '#0f172a',
       textTransform: 'capitalize',
-      fontFamily: headingFont,
    },
    nodeMeta: {
       fontSize: 12,
-      color: retroPalette.violet,
-      fontFamily: baseMono,
+      color: '#475467',
    },
    legend: {
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 24,
       padding: 12,
-      borderRadius: 18,
-      backgroundColor: '#fffbe2',
-      borderWidth: 2,
-      borderColor: retroPalette.outline,
+      borderRadius: 12,
+      backgroundColor: '#fff',
+      borderWidth: 1,
+      borderColor: '#e4e7ec',
    },
    legendDot: {
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: retroPalette.violet,
+      backgroundColor: '#007AFF',
       marginRight: 12,
    },
    legendText: {
       flex: 1,
-      color: retroPalette.plum,
+      color: '#0f172a',
       fontSize: 14,
-      fontFamily: baseMono,
    },
 });
