@@ -454,10 +454,31 @@ def rename_person():
             old_face.rename(new_face)
             print(f"✅ Renamed face: {old_face} -> {new_face}")
         
-        # Rename conversation file
+        # Rename conversation file (if present)
         if old_conv.exists():
             old_conv.rename(new_conv)
             print(f"✅ Renamed conversation: {old_conv} -> {new_conv}")
+
+        # Normalize speaker labels inside conversation entries from old_name -> new_name
+        conv_path = new_conv if new_conv.exists() else (old_conv if old_conv.exists() else None)
+        if conv_path and conv_path.exists():
+            try:
+                entries = json.loads(conv_path.read_text(encoding="utf-8"))
+                changed = False
+                if isinstance(entries, list):
+                    for entry in entries:
+                        convo = entry.get("conversation")
+                        if isinstance(convo, list):
+                            for turn in convo:
+                                spk = turn.get("speaker") if isinstance(turn, dict) else None
+                                if isinstance(spk, str) and spk.strip().lower() == old_name.strip().lower():
+                                    turn["speaker"] = new_name
+                                    changed = True
+                if changed:
+                    conv_path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
+                    print(f"✅ Updated speaker labels in {conv_path.name}: {old_name} -> {new_name}")
+            except Exception as cx:
+                print(f"⚠️ Could not normalize speakers in {conv_path.name}: {cx}")
         
         # Update embeddings.json
         if embeddings_path.exists():
@@ -468,6 +489,24 @@ def rename_person():
                 del embeddings[old_name]
                 embeddings_path.write_text(json.dumps(embeddings, indent=2), encoding="utf-8")
                 print(f"✅ Updated embeddings.json: {old_name} -> {new_name}")
+
+        # Update highlights.json person_name if exists
+        highlights_path = BASE_DIR / "highlights.json"
+        if highlights_path.exists():
+            try:
+                highlights = json.loads(highlights_path.read_text(encoding="utf-8"))
+                changed = False
+                if isinstance(highlights, list):
+                    for row in highlights:
+                        pname = (row or {}).get("person_name")
+                        if isinstance(pname, str) and pname.strip().lower() == old_name.strip().lower():
+                            row["person_name"] = new_name
+                            changed = True
+                if changed:
+                    highlights_path.write_text(json.dumps(highlights, indent=2), encoding="utf-8")
+                    print(f"✅ Updated highlights.json person_name: {old_name} -> {new_name}")
+            except Exception as hx:
+                print(f"⚠️ Could not update highlights.json for rename: {hx}")
         
         return jsonify({"success": True, "new_name": new_name})
     except Exception as e:
