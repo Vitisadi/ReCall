@@ -13,6 +13,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { BASE_URL } from '../config';
+import {
+   retroFonts,
+   retroPalette,
+   retroMenuItems,
+} from '../styles/retroTheme';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -202,132 +207,190 @@ export default function HomeScreen({ onOpenConversation }) {
    }, [nodes, width, graphHeight]);
 
    return (
-      <View style={styles.screen}>
-         <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-         >
-            <LinearGradient
-               colors={['#111827', '#1e3a8a']}
-               start={{ x: 0, y: 0 }}
-               end={{ x: 1, y: 1 }}
-               style={styles.heroCard}
+      <LinearGradient
+         colors={[retroPalette.sunsetStart, retroPalette.sunsetEnd]}
+         style={styles.gradient}
+      >
+         <View style={styles.window}>
+            <View style={styles.menuBar}>
+               {retroMenuItems.map((item) => (
+                  <Text key={item} style={styles.menuItem}>
+                     {item}
+                  </Text>
+               ))}
+               <View style={styles.menuLed} />
+            </View>
+            <ScrollView
+               style={styles.windowBody}
+               contentContainerStyle={styles.scrollContent}
+               showsVerticalScrollIndicator={false}
             >
-               <Text style={styles.heroTitle}>Meet your orbit</Text>
-               <Text style={styles.heroCopy}>
-                  Each bubble is a person you have spoken with. Tap any face to
-                  open their latest conversation.
-               </Text>
-            </LinearGradient>
-
-            {loading ? (
-               <View style={styles.loadingState}>
-                  <ActivityIndicator size='large' color='#007AFF' />
-                  <Text style={styles.loadingText}>Mapping your people…</Text>
-               </View>
-            ) : error ? (
-               <View style={styles.errorState}>
-                  <Text style={styles.errorText}>{error}</Text>
-               </View>
-            ) : preparedNodes.length === 0 ? (
-               <View style={styles.emptyState}>
-                  <Text style={styles.emptyTitle}>No faces yet</Text>
-                  <Text style={styles.emptyCopy}>
-                     Upload a video to enroll someone and start building the
-                     network.
+               <View style={styles.heroCard}>
+                  <Text style={styles.heroTitle}>Meet your orbit</Text>
+                  <Text style={styles.heroCopy}>
+                     Each bubble is a person you have spoken with. Tap any face
+                     to open their latest conversation.
                   </Text>
                </View>
-            ) : (
-               <View style={[styles.graphWrapper, { height: graphHeight }]}>
-                  {preparedNodes.map((node) => (
-                     <View
-                        key={node.name}
-                        style={[
-                           styles.nodeWrapper,
-                           {
-                              left: node.x - node.size / 2,
-                              top: node.y - node.size / 2,
-                              width: node.size,
-                              height: node.size,
-                           },
-                        ]}
-                     >
-                         <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => {
-                               if (!onOpenConversation || !node?.name) return;
-                               onOpenConversation({
-                                  name: node.name,
-                                  avatarUrl: node.image_url,
-                                  headline: node.headline,
-                               });
-                            }}
+
+               {loading ? (
+                  <View style={styles.loadingState}>
+                     <ActivityIndicator
+                        size='large'
+                        color={retroPalette.violet}
+                     />
+                     <Text style={styles.loadingText}>
+                        Mapping your people…
+                     </Text>
+                  </View>
+               ) : error ? (
+                  <View style={styles.errorState}>
+                     <Text style={styles.errorText}>{error}</Text>
+                  </View>
+               ) : preparedNodes.length === 0 ? (
+                  <View style={styles.emptyState}>
+                     <Text style={styles.emptyTitle}>No faces yet</Text>
+                     <Text style={styles.emptyCopy}>
+                        Upload a video to enroll someone and start building the
+                        network.
+                     </Text>
+                  </View>
+               ) : (
+                  <View style={[styles.graphWrapper, { height: graphHeight }]}>
+                     {preparedNodes.map((node) => (
+                        <View
+                           key={node.name}
                            style={[
-                              styles.nodeTouchable,
+                              styles.nodeWrapper,
                               {
-                                 borderRadius: node.size / 2,
+                                 left: node.x - node.size / 2,
+                                 top: node.y - node.size / 2,
+                                 width: node.size,
+                                 height: node.size,
                               },
                            ]}
                         >
-                           {node.image_url ? (
-                              <Image
-                                 source={{ uri: node.image_url }}
-                                 style={styles.nodeImage}
-                              />
-                           ) : (
-                              <View style={styles.nodeFallback}>
-                                 <Text style={styles.nodeFallbackText}>
-                                    {node.name?.[0]?.toUpperCase() || '?'}
-                                 </Text>
-                              </View>
-                           )}
-                        </TouchableOpacity>
-                        <View style={styles.nodeLabel}>
-                           <Text style={styles.nodeName}>
-                              {node.name || 'Unknown'}
-                           </Text>
-                           <Text style={styles.nodeMeta}>
-                              {node.share
-                                 ? `${node.share}% of memory`
-                                 : '0% of memory'}
-                           </Text>
+                           <TouchableOpacity
+                              activeOpacity={0.85}
+                              onPress={() => {
+                                 if (!onOpenConversation || !node?.name) return;
+                                 onOpenConversation({
+                                    name: node.name,
+                                    avatarUrl: node.image_url,
+                                    headline: node.headline,
+                                 });
+                              }}
+                              style={[
+                                 styles.nodeTouchable,
+                                 {
+                                    borderRadius: node.size / 2,
+                                 },
+                              ]}
+                           >
+                              {node.image_url ? (
+                                 <Image
+                                    source={{ uri: node.image_url }}
+                                    style={styles.nodeImage}
+                                 />
+                              ) : (
+                                 <View style={styles.nodeFallback}>
+                                    <Text style={styles.nodeFallbackText}>
+                                       {node.name?.[0]?.toUpperCase() || '?'}
+                                    </Text>
+                                 </View>
+                              )}
+                           </TouchableOpacity>
+                           <View style={styles.nodeLabel}>
+                              <Text style={styles.nodeName}>
+                                 {node.name || 'Unknown'}
+                              </Text>
+                              <Text style={styles.nodeMeta}>
+                                 {node.share
+                                    ? `${node.share}% of memory`
+                                    : '0% of memory'}
+                              </Text>
+                           </View>
                         </View>
-                     </View>
-                  ))}
-               </View>
-            )}
+                     ))}
+                  </View>
+               )}
 
-            <View style={styles.legend}>
-               <View style={styles.legendDot} />
-               <Text style={styles.legendText}>
-                  Tap a face to jump into their latest conversation.
-               </Text>
-            </View>
-         </ScrollView>
-      </View>
+               <View style={styles.legend}>
+                  <View style={styles.legendDot} />
+                  <Text style={styles.legendText}>
+                     Tap a face to jump into their latest conversation.
+                  </Text>
+               </View>
+            </ScrollView>
+         </View>
+      </LinearGradient>
    );
 }
 
+const baseMono = retroFonts.base;
+const headingFont = retroFonts.heading;
+
 const styles = StyleSheet.create({
-   screen: {
+   gradient: { flex: 1 },
+   window: {
       flex: 1,
-      backgroundColor: '#f8fafc',
+      margin: 12,
+      borderRadius: 24,
+      borderWidth: 3,
+      borderColor: retroPalette.outline,
+      backgroundColor: retroPalette.warmSand,
+      shadowColor: '#1b0f2c',
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      overflow: 'hidden',
+   },
+   menuBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: retroPalette.menuGray,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+      paddingBottom: 8,
+      borderBottomWidth: 2,
+      borderBottomColor: retroPalette.outline,
+   },
+   menuItem: {
+      marginRight: 18,
+      fontSize: 13,
+      color: retroPalette.menuText,
+      fontFamily: headingFont,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+   },
+   menuLed: {
+      marginLeft: 'auto',
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: retroPalette.teal,
+      borderWidth: 1,
+      borderColor: retroPalette.outline,
+   },
+   windowBody: {
+      flex: 1,
    },
    scrollContent: {
       paddingHorizontal: 20,
-      marginTop: 36,
-      paddingBottom: 24,
+      paddingTop: 24,
+      paddingBottom: 32,
    },
    heroCard: {
-      borderRadius: 26,
+      borderRadius: 28,
       padding: 24,
-      marginTop: 36,
-      marginBottom: 0,
-      shadowColor: '#000',
-      shadowOpacity: 0.35,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 10,
+      marginBottom: 12,
+      borderWidth: 3,
+      borderColor: retroPalette.outline,
+      backgroundColor: '#fff0f5',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
    },
    heroBadge: {
       alignSelf: 'flex-start',
@@ -346,20 +409,17 @@ const styles = StyleSheet.create({
    },
    heroTitle: {
       fontSize: 30,
-      color: '#fff',
+      color: retroPalette.outline,
       fontWeight: '700',
       marginBottom: 8,
-      fontFamily:
-         Platform.OS === 'ios'
-            ? 'American Typewriter'
-            : Platform.OS === 'android'
-            ? 'monospace'
-            : 'Courier New',
+      fontFamily: headingFont,
+      textTransform: 'uppercase',
    },
    heroCopy: {
-      color: '#cbd5f5',
+      color: retroPalette.plum,
       fontSize: 15,
       lineHeight: 22,
+      fontFamily: baseMono,
    },
    subtitle: {
       fontSize: 16,
@@ -379,42 +439,58 @@ const styles = StyleSheet.create({
    },
    loadingText: {
       marginTop: 12,
-      color: '#475467',
+      color: retroPalette.plum,
       fontSize: 16,
+      fontFamily: baseMono,
    },
    errorState: {
       padding: 20,
-      borderRadius: 12,
-      backgroundColor: '#fee2e2',
+      borderRadius: 20,
+      backgroundColor: '#ffd9e1',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    errorText: {
-      color: '#991b1b',
+      color: retroPalette.coral,
       fontSize: 16,
       textAlign: 'center',
+      fontFamily: baseMono,
    },
    emptyState: {
       padding: 32,
-      borderRadius: 18,
-      backgroundColor: '#e0f2fe',
+      borderRadius: 22,
+      backgroundColor: '#fffbe2',
       alignItems: 'center',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
    },
    emptyTitle: {
       fontSize: 20,
-      color: '#0f172a',
+      color: retroPalette.outline,
       fontWeight: '700',
       marginBottom: 6,
+      fontFamily: headingFont,
    },
    emptyCopy: {
-      color: '#0f172a',
+      color: retroPalette.plum,
       textAlign: 'center',
+      fontFamily: baseMono,
    },
    graphWrapper: {
       marginTop: 24,
-      borderRadius: 24,
-      backgroundColor: '#fff',
-      borderWidth: 1,
-      borderColor: '#e4e7ec',
+      borderRadius: 28,
+      backgroundColor: '#fff5dd',
+      borderWidth: 3,
+      borderColor: retroPalette.outline,
       overflow: 'hidden',
+      shadowColor: '#2c0d38',
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
    },
    nodeWrapper: {
       position: 'absolute',
@@ -425,12 +501,12 @@ const styles = StyleSheet.create({
       height: '100%',
       overflow: 'hidden',
       borderWidth: 3,
-      borderColor: '#fff',
-      backgroundColor: '#d9e2ec',
-      shadowColor: '#000',
+      borderColor: retroPalette.outline,
+      backgroundColor: '#f5d0ff',
+      shadowColor: '#2c0d38',
       shadowOpacity: 0.2,
       shadowOffset: { width: 0, height: 6 },
-      shadowRadius: 6,
+      shadowRadius: 8,
       elevation: 6,
    },
    nodeImage: {
@@ -441,47 +517,56 @@ const styles = StyleSheet.create({
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#c7d2fe',
+      backgroundColor: retroPalette.lilac,
    },
    nodeFallbackText: {
       fontSize: 42,
-      color: '#1d1d1f',
+      color: retroPalette.outline,
       fontWeight: '700',
+      fontFamily: headingFont,
    },
    nodeLabel: {
       marginTop: 8,
       alignItems: 'center',
+      paddingHorizontal: 6,
+      backgroundColor: '#fff3f9',
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    nodeName: {
       fontSize: 16,
       fontWeight: '700',
-      color: '#0f172a',
+      color: retroPalette.outline,
       textTransform: 'capitalize',
+      fontFamily: headingFont,
    },
    nodeMeta: {
       fontSize: 12,
-      color: '#475467',
+      color: retroPalette.violet,
+      fontFamily: baseMono,
    },
    legend: {
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 24,
       padding: 12,
-      borderRadius: 12,
-      backgroundColor: '#fff',
-      borderWidth: 1,
-      borderColor: '#e4e7ec',
+      borderRadius: 18,
+      backgroundColor: '#fffbe2',
+      borderWidth: 2,
+      borderColor: retroPalette.outline,
    },
    legendDot: {
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: '#007AFF',
+      backgroundColor: retroPalette.violet,
       marginRight: 12,
    },
    legendText: {
       flex: 1,
-      color: '#0f172a',
+      color: retroPalette.plum,
       fontSize: 14,
+      fontFamily: baseMono,
    },
 });
