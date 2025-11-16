@@ -9,6 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 HIGHLIGHTS_PATH = BASE_DIR / "highlights.json"
 MAX_TRANSCRIPT_LINES = 40
 MAX_RETURNED_HIGHLIGHTS = 50
+VALID_HIGHLIGHT_STATUSES = {"active", "completed", "dismissed"}
+DEFAULT_HIGHLIGHT_STATUS = "active"
 
 
 def _ensure_storage_file() -> None:
@@ -240,7 +242,9 @@ def _upsert_highlights(
         }
 
         if match:
+            existing_status = match.get("status", DEFAULT_HIGHLIGHT_STATUS)
             match.update(payload)
+            match["status"] = existing_status
             match["updated_at"] = now_ts
             changed = True
             persisted.append(match)
@@ -249,6 +253,7 @@ def _upsert_highlights(
                 "id": f"hl_{uuid.uuid4().hex[:10]}",
                 **payload,
                 "created_at": now_ts,
+                "status": DEFAULT_HIGHLIGHT_STATUS,
             }
             store.append(new_entry)
             changed = True
@@ -270,6 +275,8 @@ def get_upcoming_highlights(limit: int = MAX_RETURNED_HIGHLIGHTS) -> List[Dict[s
             continue
         if event_ts < now_ts:
             continue
+        if row.get("status", DEFAULT_HIGHLIGHT_STATUS) != DEFAULT_HIGHLIGHT_STATUS:
+            continue
         remaining_sec = max(0, event_ts - now_ts)
         days = remaining_sec // 86400
         hours = (remaining_sec % 86400) // 3600
@@ -282,3 +289,29 @@ def get_upcoming_highlights(limit: int = MAX_RETURNED_HIGHLIGHTS) -> List[Dict[s
     if limit and len(upcoming) > limit:
         upcoming = upcoming[:limit]
     return upcoming
+
+
+def set_highlight_status(highlight_id: str, raw_status: str):
+    status = (raw_status or "").strip().lower()
+    if status not in VALID_HIGHLIGHT_STATUSES:
+        return None, "invalid_status"
+
+    store = _load_store()
+    target = next((item for item in store if item.get("id") == highlight_id), None)
+    if not target:
+        return None, "not_found"
+
+    now_ts = int(time.time())
+    target["status"] = status
+    if status == "completed":
+        target["completed_at"] = now_ts
+        target.pop("dismissed_at", None)
+    elif status == "dismissed":
+        target["dismissed_at"] = now_ts
+        target.pop("completed_at", None)
+    else:  # active
+        target.pop("completed_at", None)
+        target.pop("dismissed_at", None)
+    target["updated_at"] = now_ts
+    _write_store(store)
+    return target, "updated"

@@ -52,6 +52,7 @@ export default function HighlightsScreen({ onOpenConversation }) {
    const [loading, setLoading] = useState(true);
    const [refreshing, setRefreshing] = useState(false);
    const [error, setError] = useState('');
+   const [actioning, setActioning] = useState(null);
 
    const fetchHighlights = useCallback(async (silent = false) => {
       if (!silent) {
@@ -92,8 +93,32 @@ export default function HighlightsScreen({ onOpenConversation }) {
       [onOpenConversation]
    );
 
+   const handleUpdateStatus = useCallback(async (highlightId, status) => {
+      if (!highlightId || !status) return;
+      setActioning({ id: highlightId, status });
+      setError('');
+      try {
+         await axios.patch(`${BASE_URL}/api/highlights/${highlightId}`, {
+            status,
+         });
+         setHighlights((prev) =>
+            prev.filter((item) => item.id !== highlightId)
+         );
+      } catch (err) {
+         const message =
+            err?.response?.data?.error ||
+            'Unable to update highlight right now.';
+         setError(message);
+      } finally {
+         setActioning(null);
+      }
+   }, []);
+
    const renderHighlight = ({ item }) => {
       const countdown = formatCountdown(item.event_timestamp, item.event_date);
+      const isActioning = actioning?.id === item.id;
+      const workingStatus = isActioning ? actioning?.status : '';
+      const disableActions = Boolean(isActioning);
       return (
          <TouchableOpacity
             style={styles.card}
@@ -125,7 +150,41 @@ export default function HighlightsScreen({ onOpenConversation }) {
                <Text style={styles.metaText}>
                   Confidence: {Math.round((item.confidence || 0) * 100)}%
                </Text>
-               <Text style={styles.metaText}>Tap to jump to convo</Text>
+               <Text style={styles.metaText}>Tap card to jump to convo</Text>
+            </View>
+            <View style={styles.actionsRow}>
+               <TouchableOpacity
+                  style={[
+                     styles.actionButton,
+                     styles.completeButton,
+                     disableActions ? styles.actionButtonDisabled : null,
+                  ]}
+                  activeOpacity={0.85}
+                  disabled={disableActions}
+                  onPress={() => handleUpdateStatus(item.id, 'completed')}
+               >
+                  <Text style={styles.actionButtonText}>
+                     {isActioning && workingStatus === 'completed'
+                        ? 'Completing…'
+                        : 'Complete'}
+                  </Text>
+               </TouchableOpacity>
+               <TouchableOpacity
+                  style={[
+                     styles.actionButton,
+                     styles.dismissButton,
+                     disableActions ? styles.actionButtonDisabled : null,
+                  ]}
+                  activeOpacity={0.85}
+                  disabled={disableActions}
+                  onPress={() => handleUpdateStatus(item.id, 'dismissed')}
+               >
+                  <Text style={styles.actionButtonText}>
+                     {isActioning && workingStatus === 'dismissed'
+                        ? 'Dismissing…'
+                        : 'Dismiss'}
+                  </Text>
+               </TouchableOpacity>
             </View>
          </TouchableOpacity>
       );
@@ -196,9 +255,11 @@ const styles = StyleSheet.create({
       paddingHorizontal: 20,
       paddingTop: 16,
       paddingBottom: 8,
+      marginTop: 36,
    },
    header: {
       fontSize: 22,
+      marginTop: 36,
       fontWeight: '700',
       color: '#111',
    },
@@ -287,6 +348,33 @@ const styles = StyleSheet.create({
    metaText: {
       fontSize: 12,
       color: '#777',
+   },
+   actionsRow: {
+      flexDirection: 'row',
+      marginTop: 12,
+   },
+   actionButton: {
+      flex: 1,
+      borderRadius: 999,
+      paddingVertical: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginHorizontal: 4,
+   },
+   completeButton: {
+      backgroundColor: '#0d9b6c',
+   },
+   dismissButton: {
+      backgroundColor: '#f05a4f',
+   },
+   actionButtonText: {
+      color: '#fff',
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      fontSize: 13,
+   },
+   actionButtonDisabled: {
+      opacity: 0.55,
    },
    loadingState: {
       flex: 1,
