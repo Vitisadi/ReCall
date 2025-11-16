@@ -17,6 +17,7 @@ from services.linkedin_enricher import enrich_linkedin_profile
 from services.highlights import (
     detect_and_store_highlights,
     get_upcoming_highlights,
+    set_highlight_status,
 )
 from google import genai
 
@@ -196,6 +197,23 @@ def list_highlights():
     """Return upcoming highlight reminders detected from transcripts."""
     highlights = get_upcoming_highlights()
     return jsonify({"highlights": highlights})
+
+
+@app.route("/api/highlights/<highlight_id>", methods=["PATCH"])
+def update_highlight(highlight_id):
+    payload = request.get_json(silent=True) or {}
+    desired_status = (payload.get("status") or "").strip().lower()
+    if not desired_status:
+        return jsonify({"error": "Missing status."}), 400
+
+    updated, status_key = set_highlight_status(highlight_id, desired_status)
+
+    if status_key == "invalid_status":
+        return jsonify({"error": "Invalid status."}), 400
+    if status_key == "not_found":
+        return jsonify({"error": f"Highlight {highlight_id} not found."}), 404
+
+    return jsonify({"highlight": updated})
 
 # process uploaded video
 """
