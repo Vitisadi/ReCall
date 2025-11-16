@@ -83,10 +83,11 @@ export default function HighlightsScreen({ onOpenConversation }) {
       (item) => {
          if (!item?.person_name || typeof onOpenConversation !== 'function')
             return;
-         onOpenConversation({
-            name: item.person_name,
-            headline: item.person_headline,
-         });
+          onOpenConversation({
+             name: item.person_name,
+             headline: item.person_headline,
+             avatarUrl: item.person_image_url || item.image_url,
+          });
       },
       [onOpenConversation]
    );
@@ -186,6 +187,7 @@ const styles = StyleSheet.create({
    screen: {
       flex: 1,
       backgroundColor: '#f7f7f7',
+      paddingTop: 40,
    },
    headerRow: {
       flexDirection: 'row',
