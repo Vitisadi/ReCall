@@ -20,6 +20,7 @@ export default function ConversationScreen({
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState(null);
    const [data, setData] = useState([]);
+   const [headline, setHeadline] = useState('');
    const listRef = useRef(null);
 
    useEffect(() => {
@@ -30,7 +31,17 @@ export default function ConversationScreen({
          .then((res) => {
             if (!mounted) return;
             // API returns { name, conversation } or 404
-            setData(res.data.conversation || []);
+            const conversations = res.data.conversation || [];
+            setData(conversations);
+            // Get headline from the most recent entry
+            if (conversations.length > 0) {
+               for (let i = conversations.length - 1; i >= 0; i--) {
+                  if (conversations[i].headline) {
+                     setHeadline(conversations[i].headline);
+                     break;
+                  }
+               }
+            }
             setError(null);
          })
          .catch((err) => {
@@ -152,7 +163,12 @@ export default function ConversationScreen({
             >
                <Text style={styles.backText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>{name}</Text>
+            <View style={styles.titleContainer}>
+               <Text style={styles.title}>{name}</Text>
+               {headline ? (
+                  <Text style={styles.titleHeadline}>{headline}</Text>
+               ) : null}
+            </View>
          </View>
 
          {loading && (
@@ -210,14 +226,31 @@ const styles = StyleSheet.create({
             ? 'monospace'
             : 'Courier New',
    },
-   title: {
+   titleContainer: {
       position: 'absolute',
       left: 0,
       right: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+   },
+   title: {
       textAlign: 'center',
       fontSize: 18,
       fontWeight: '700',
       color: '#000',
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
+   },
+   titleHeadline: {
+      textAlign: 'center',
+      fontSize: 12,
+      fontWeight: '400',
+      color: '#666',
+      marginTop: 2,
       fontFamily:
          Platform.OS === 'ios'
             ? 'American Typewriter'

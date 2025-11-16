@@ -88,3 +88,4 @@ faces_db/temp_crops/**
 backend/analyzers/google_key.json
 backend/temp_audio.wav
 *.pyc
+/backend/faces_db

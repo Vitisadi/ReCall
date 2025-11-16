@@ -203,10 +203,19 @@ def ask_gemini(sentences):
     - Locations
     - Job titles
 
+    4. Generate a professional **headline** (like LinkedIn) for the other person:
+    - Format: "[Role/Title] @ [Company]" or "[Role] | [Specialty]" or "[Position] at [Organization]"
+    - Keep it under 50 characters
+    - Use information from the conversation (job title, company, role, etc.)
+    - If no professional info is found, use a descriptive phrase based on context
+    - Examples: "SWE @ Google", "Student at MIT", "Product Manager | Tech", "Founder @ Startup"
+    - If absolutely no info: use or "Contact" or "Friend"
+
     Output **pure JSON only** in this format:
 
     {{
     "guessed_name": "Name or 'Other'",
+    "headline": "Professional subtitle/headline",
     "conversation": [
         {{
         "speaker": "Me" or "<guessed_name>",

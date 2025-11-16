@@ -66,9 +66,26 @@ def get_people():
     people = []
     for face_file in FACES_DIR.glob("*.*"):
         if face_file.is_file():
+            name = face_file.stem
+            headline = ""
+            # Try to get the latest headline from conversation file
+            conv_path = MEMORY_DIR / f"{name}.json"
+            if conv_path.exists():
+                try:
+                    entries = json.loads(conv_path.read_text(encoding="utf-8"))
+                    if entries and isinstance(entries, list):
+                        # Get headline from most recent entry
+                        for entry in reversed(entries):
+                            if entry.get("headline"):
+                                headline = entry["headline"]
+                                break
+                except Exception:
+                    pass
+            
             people.append({
-                "name": face_file.stem,
-                "image_url": f"{BASE_URL}/faces/{face_file.name}"
+                "name": name,
+                "image_url": f"{BASE_URL}/faces/{face_file.name}",
+                "headline": headline
             })
     return jsonify(people)
 
@@ -259,6 +276,7 @@ def process_video(video_path):
         "guessed_name": transcript_result.get("guessed_name"),
         "conversation": transcript_result.get("conversation", []),
         "keywords": transcript_result.get("keywords", []),
+        "headline": transcript_result.get("headline", ""),
         "face_status": face_result.get("status", "unknown"),
         "face_name": face_result.get("name"),
         "auto_enrolled": face_result.get("auto_enrolled", False),
@@ -285,6 +303,7 @@ def save_conversation(data):
         "timestamp": int(time.time()),
         "conversation": data.get("conversation", []),
         "keywords": data.get("keywords", []),
+        "headline": data.get("headline", ""),
     }
 
     latest_profile = next(

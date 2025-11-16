@@ -156,7 +156,12 @@ export default function PeopleScreen({ onOpenConversation }) {
                      source={{ uri: person.image_url }}
                      style={styles.image}
                   />
-                  <Text style={styles.name}>{person.name || 'Unknown'}</Text>
+                  <View style={styles.nameContainer}>
+                     <Text style={styles.name}>{person.name || 'Unknown'}</Text>
+                     {person.headline ? (
+                        <Text style={styles.headline}>{person.headline}</Text>
+                     ) : null}
+                  </View>
 
                   <TouchableOpacity
                      style={styles.sign}
@@ -622,12 +627,15 @@ const styles = StyleSheet.create({
       borderWidth: 1,
       borderColor: '#000',
    },
+   nameContainer: {
+      flex: 1,
+      marginLeft: 12,
+      justifyContent: 'center',
+   },
    name: {
       fontSize: 18,
       fontWeight: '700',
       color: '#000',
-      marginLeft: 12,
-      flex: 1,
       fontFamily:
          Platform.OS === 'ios'
             ? 'American Typewriter'
@@ -635,6 +643,18 @@ const styles = StyleSheet.create({
             ? 'monospace'
             : 'Courier New',
       textTransform: 'uppercase',
+   },
+   headline: {
+      fontSize: 13,
+      fontWeight: '400',
+      color: '#666',
+      marginTop: 2,
+      fontFamily:
+         Platform.OS === 'ios'
+            ? 'American Typewriter'
+            : Platform.OS === 'android'
+            ? 'monospace'
+            : 'Courier New',
    },
    sign: {
       marginLeft: 12,
