@@ -83,6 +83,14 @@ def build_transcript(response):
 
     all_words.sort(key=lambda x: x["start"])
 
+    # Normalize speaker labels to 0 and 1
+    # Get unique speakers and map first speaker to 0, second to 1
+    if all_words:
+        unique_speakers = sorted(set(w["speaker"] for w in all_words))
+        speaker_map = {speaker: idx for idx, speaker in enumerate(unique_speakers)}
+        for w in all_words:
+            w["speaker"] = speaker_map[w["speaker"]]
+
     # Group into sentences
     sentences = []
     curr_speaker = None
@@ -120,8 +128,10 @@ def ask_gemini(sentences):
     prompt = f"""
     You are given a conversation between two speakers:
 
-    - **Speaker 0** = "Me" (the person wearing glasses)
+    - **Speaker 0** = "Me" (the person wearing glasses and recording this conversation)
     - **Speaker 1** = The other person whose name you must determine
+    
+    **IMPORTANT**: Speaker 0 is ALWAYS the first person who speaks in this conversation (the recorder).
 
     Conversation:
     {conv_text}
@@ -160,12 +170,15 @@ def ask_gemini(sentences):
             Use Speaker 1’s introduction.
 
     D. GREETING SCENARIOS
-        - If Speaker 0 says:
-            “Hey X”, “What’s up X?”, “Yo X”, “Thanks X”
-          → X is the other person's name.
-
+        - If you see "Hey X" or "Hi X" or "Nice to meet you X":
+          * The person SAYING this phrase is greeting X
+          * X is the OTHER person (the one being greeted)
+        
+        - If Speaker 0 says "Hey X" → X is Speaker 1's name
+        - If Speaker 1 says "Hey X" → X is Speaker 0's name (but Speaker 0 is still "Me")
+        
         - Names spoken casually still count:
-            “So X, what do you think?”
+            "So X, what do you think?"
           → X is the other person's name.
 
     E. WHEN A THIRD PERSON IS MENTIONED
@@ -194,10 +207,24 @@ def ask_gemini(sentences):
         - Never invent or hallucinate a name.
 
     2. Transform the transcript into JSON with labeled speakers:
-    Speaker 0 → "Me"
-    Speaker 1 → "<guessed_name>"
+    **ABSOLUTE RULE - SPEAKER 0 = ME, ALWAYS**: 
+    - Speaker 0 is ALWAYS "Me" - this never changes
+    - Speaker 1 is ALWAYS the other person (use their guessed_name)
+    - Simply replace the labels, do NOT swap or reverse speakers
+    
+    **Example 1**:
+    Input: "1. [Speaker 0]: Hey John, how are you?"
+           "2. [Speaker 1]: I'm good, thanks!"
+    Output: {{"speaker": "Me", "text": "Hey John, how are you?"}},
+            {{"speaker": "John", "text": "I'm good, thanks!"}}
+    
+    **Example 2**:
+    Input: "1. [Speaker 0]: I worked at Google"
+           "2. [Speaker 1]: That's cool"
+    Output: {{"speaker": "Me", "text": "I worked at Google"}},
+            {{"speaker": "Other", "text": "That's cool"}}
 
-    3. Extract up to 6 **search keywords** about the other person:
+    3. Extract up to 6 **search keywords** about the other person (if exists, don't remember stupid things):
     - Company names
     - Schools
     - Locations
