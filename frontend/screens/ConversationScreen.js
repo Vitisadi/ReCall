@@ -580,7 +580,7 @@ const baseMono =
 const styles = StyleSheet.create({
    container: { flex: 1, backgroundColor: '#fff' },
    header: {
-      paddingTop: 16,
+      paddingTop: Platform.OS === 'ios' ? 52 : 32,
       paddingBottom: 8,
       paddingHorizontal: 12,
       borderBottomWidth: 1,
