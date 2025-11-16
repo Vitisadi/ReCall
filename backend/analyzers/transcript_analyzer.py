@@ -211,6 +211,15 @@ def ask_gemini(sentences):
     - Examples: "SWE @ Google", "Student at MIT", "Product Manager | Tech", "Founder @ Startup"
     - If absolutely no info: use or "Contact" or "Friend"
 
+    5. Determine if there's **LinkedIn potential**:
+    - Set "has_linkedin_potential" to true if the conversation mentions **at least ONE** of the following:
+      * Any company or employer name (e.g., "Google", "Microsoft", "Tesla", "a startup", "my company")
+      * Any school, university, or educational institution (e.g., "MIT", "Stanford", "high school", "college")
+      * Any job title or professional role (e.g., "engineer", "manager", "student", "developer", "CEO", "intern")
+      * Any career-related information (e.g., "I work at", "I study", "my job", "my major", "my team")
+    - Set to false ONLY if the conversation is purely casual/personal with absolutely zero professional, educational, or career context
+    - Be generous: even one mention of work, school, or professional activity should set this to true
+
     Output **pure JSON only** in this format:
 
     {{
@@ -222,7 +231,8 @@ def ask_gemini(sentences):
         "text": "the spoken line"
         }}
     ],
-    "keywords": ["keyword1", "keyword2"]
+    "keywords": ["keyword1", "keyword2"],
+    "has_linkedin_potential": true or false
     }}
     """
 

@@ -463,39 +463,48 @@ export default function UploadScreen() {
       )}
       {result && result.ok && result.data.face_name && !isEditingName && !showConfirmPrompt && !keywordsVisible && (
         <>
-          <TouchableOpacity
-            style={styles.confirmAcceptButton}
-            onPress={async () => {
-              if (!result?.data?.face_name || linkedinLoading) return;
-              setLinkedinLoading(true);
-              setLinkedinProgress(0);
-              // simple progress animation
-              linkedinTimer.current = setInterval(() => {
-                setLinkedinProgress((p) => Math.min(94, p + (5 + Math.random() * 7)));
-              }, 280);
-              try {
-                await triggerLinkedInEnrichment(result.data.face_name);
-                await updateHeadlineFromConversation(result.data.face_name);
-              } finally {
-                if (linkedinTimer.current) {
-                  clearInterval(linkedinTimer.current);
-                  linkedinTimer.current = null;
-                }
-                setLinkedinProgress(100);
-                setLinkedinLoading(false);
-                // Always reveal keywords after enrichment attempt
-                setKeywordsVisible(true);
-              }
-            }}
-          >
-            <Text style={styles.confirmAcceptText}>Find More Data</Text>
-          </TouchableOpacity>
-          {linkedinLoading && (
-            <View style={{ width: '100%', marginTop: 8 }}>
-              <ProgressBar progress={linkedinProgress} />
+          {result.data.has_linkedin_potential ? (
+            <>
+              <TouchableOpacity
+                style={styles.confirmAcceptButton}
+                onPress={async () => {
+                  if (!result?.data?.face_name || linkedinLoading) return;
+                  setLinkedinLoading(true);
+                  setLinkedinProgress(0);
+                  // simple progress animation
+                  linkedinTimer.current = setInterval(() => {
+                    setLinkedinProgress((p) => Math.min(94, p + (5 + Math.random() * 7)));
+                  }, 280);
+                  try {
+                    await triggerLinkedInEnrichment(result.data.face_name);
+                    await updateHeadlineFromConversation(result.data.face_name);
+                  } finally {
+                    if (linkedinTimer.current) {
+                      clearInterval(linkedinTimer.current);
+                      linkedinTimer.current = null;
+                    }
+                    setLinkedinProgress(100);
+                    setLinkedinLoading(false);
+                    // Always reveal keywords after enrichment attempt
+                    setKeywordsVisible(true);
+                  }
+                }}
+              >
+                <Text style={styles.confirmAcceptText}>Find More Data</Text>
+              </TouchableOpacity>
+              {linkedinLoading && (
+                <View style={{ width: '100%', marginTop: 8 }}>
+                  <ProgressBar progress={linkedinProgress} />
+                </View>
+              )}
+            </>
+          ) : (
+            <View style={{ marginTop: 12, width: '100%', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, color: '#666', fontFamily: Platform.OS === 'ios' ? 'American Typewriter' : (Platform.OS === 'android' ? 'monospace' : 'Courier New') }}>
+                Conversation recorded
+              </Text>
             </View>
           )}
-          
         </>
       )}
 
