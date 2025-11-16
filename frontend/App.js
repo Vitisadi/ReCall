@@ -83,7 +83,7 @@ export default function App() {
       return (
          <SafeAreaView style={{ flex: 1 }}>
             <View style={styles.agreementContainer}>
-               <ActivityIndicator size="large" color="#007AFF" />
+               <ActivityIndicator size='large' color='#007AFF' />
                <Text style={styles.agreementLoadingText}>Preparing app…</Text>
             </View>
          </SafeAreaView>
@@ -104,7 +104,7 @@ export default function App() {
                <TouchableOpacity
                   style={styles.checkboxRow}
                   onPress={() => setAgreementChecked((prev) => !prev)}
-                  accessibilityRole="checkbox"
+                  accessibilityRole='checkbox'
                   accessibilityState={{ checked: agreementChecked }}
                >
                   <View
@@ -145,14 +145,14 @@ export default function App() {
       <SafeAreaView style={{ flex: 1 }}>
          <View style={styles.container}>
             {activeConversation ? (
-                <ConversationScreen
-                   name={activeConversation.name}
-                   avatarUrl={activeConversation.avatarUrl}
-                   headline={activeConversation.headline}
-                   highlightTimestamp={activeConversation.highlightTimestamp}
-                   highlightIndex={activeConversation.highlightIndex}
-                   onBack={() => setActiveConversation(null)}
-                />
+               <ConversationScreen
+                  name={activeConversation.name}
+                  avatarUrl={activeConversation.avatarUrl}
+                  headline={activeConversation.headline}
+                  highlightTimestamp={activeConversation.highlightTimestamp}
+                  highlightIndex={activeConversation.highlightIndex}
+                  onBack={() => setActiveConversation(null)}
+               />
             ) : (
                <>
                   {activeTab === 'home' && (
@@ -222,27 +222,6 @@ export default function App() {
                   style={[
                      styles.navItem,
                      styles.navSeparator,
-                     activeTab === 'memory' && styles.navItemActive,
-                  ]}
-                  onPress={() => {
-                     setActiveConversation(null);
-                     setActiveTab('memory');
-                  }}
-               >
-                  <Text
-                     style={[
-                        styles.navText,
-                        activeTab === 'memory' && styles.navTextActive,
-                     ]}
-                     >
-                     Memory
-                  </Text>
-               </TouchableOpacity>
-
-               <TouchableOpacity
-                  style={[
-                     styles.navItem,
-                     styles.navSeparator,
                      activeTab === 'highlights' && styles.navItemActive,
                   ]}
                   onPress={() => {
@@ -257,6 +236,27 @@ export default function App() {
                      ]}
                   >
                      Highlights
+                  </Text>
+               </TouchableOpacity>
+
+               <TouchableOpacity
+                  style={[
+                     styles.navItem,
+                     styles.navSeparator,
+                     activeTab === 'memory' && styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                     setActiveConversation(null);
+                     setActiveTab('memory');
+                  }}
+               >
+                  <Text
+                     style={[
+                        styles.navText,
+                        activeTab === 'memory' && styles.navTextActive,
+                     ]}
+                  >
+                     Memory
                   </Text>
                </TouchableOpacity>
             </View>
