@@ -4,6 +4,7 @@ import json
 import threading
 import time
 import re
+import difflib
 from dotenv import load_dotenv
 from pathlib import Path
 from analyzers.face_analyzer import analyze_video
@@ -545,6 +546,34 @@ SELF_SPEAKER_LABELS = {"me", "myself", "user"}
 def _tokenize_text(text):
     return [w for w in re.findall(r"\w+", text.lower()) if w and w not in STOPWORDS]
 
+def _is_fuzzy_token_match(token, word):
+    if not token or not word:
+        return False
+    if token == word:
+        return True
+    if abs(len(token) - len(word)) > 2:
+        return False
+    similarity = difflib.SequenceMatcher(None, token, word).ratio()
+    return similarity >= 0.78
+
+def _score_tokens_in_text(tokens, lower_text):
+    if not tokens or not lower_text:
+        return 0
+    words = re.findall(r"\w+", lower_text)
+    score = 0
+    for token in tokens:
+        if not token:
+            continue
+        occurrences = lower_text.count(token)
+        if occurrences:
+            score += occurrences
+            continue
+        for word in words:
+            if _is_fuzzy_token_match(token, word):
+                score += 1
+                break
+    return score
+
 def _collect_person_assets():
     assets = {}
     for face_file in FACES_DIR.glob("*.*"):
@@ -690,7 +719,7 @@ def find_relevant_people(question, target_name=None):
                     continue
                 lower_text = text.lower()
                 if tokens:
-                    line_score = sum(lower_text.count(tok) for tok in tokens)
+                    line_score = _score_tokens_in_text(tokens, lower_text)
                 else:
                     line_score = 1
 
