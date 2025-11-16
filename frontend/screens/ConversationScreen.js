@@ -97,10 +97,10 @@ export default function ConversationScreen({
                   if (conversations[i].headline) {
                      setConversationHeadline(conversations[i].headline);
                   }
-                  if (conversations[i].linkedin_url) {
-                     setLinkedinUrl(conversations[i].linkedin_url);
+                  if (conversations[i].linkedin) {
+                     setLinkedinUrl(conversations[i].linkedin);
                   }
-                  if (conversations[i].headline || conversations[i].linkedin_url) {
+                  if (conversations[i].headline || conversations[i].linkedin) {
                      break;
                   }
                }
@@ -362,9 +362,15 @@ export default function ConversationScreen({
                      {linkedinUrl ? (
                         <TouchableOpacity
                            onPress={() => Linking.openURL(linkedinUrl)}
-                           style={styles.linkedinLinkWrapper}
+                           style={styles.linkedinRow}
+                           activeOpacity={0.8}
                         >
-                           <Text style={styles.linkedinLink}>View LinkedIn</Text>
+                           <View style={styles.linkedinIcon}>
+                              <Text style={styles.linkedinIconText}>in</Text>
+                           </View>
+                           <Text style={styles.linkedinUrl} numberOfLines={1}>
+                              {linkedinUrl}
+                           </Text>
                         </TouchableOpacity>
                      ) : null}
                   </View>
@@ -654,15 +660,34 @@ const styles = StyleSheet.create({
       textAlign: 'center',
       fontFamily: baseMono,
    },
-   linkedinLinkWrapper: {
+   linkedinRow: {
       marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'center',
+      paddingHorizontal: 8,
    },
-   linkedinLink: {
+   linkedinIcon: {
+      width: 22,
+      height: 22,
+      borderRadius: 4,
+      backgroundColor: '#0A66C2',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+   },
+   linkedinIconText: {
+      color: '#fff',
+      fontWeight: '700',
+      fontSize: 12,
+      fontFamily: baseMono,
+   },
+   linkedinUrl: {
       fontSize: 13,
-      color: '#0077b5',
-      textAlign: 'center',
+      color: '#0A66C2',
       textDecorationLine: 'underline',
       fontFamily: baseMono,
+      maxWidth: '85%',
    },
    list: {
       paddingBottom: Platform.OS === 'ios' ? 260 : 240,
