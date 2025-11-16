@@ -113,61 +113,57 @@ export default function ConversationScreen({
                   <View style={styles.entryDivider} />
                </View>
             ) : null}
-            {Array.isArray(item.conversation)
-               ? item.conversation.map((m, i) => {
-                    const isObject = m && typeof m === 'object';
-                    const speaker = isObject && m.speaker ? m.speaker : '';
-                    const text = isObject
-                       ? m.text != null
-                          ? m.text
-                          : JSON.stringify(m)
-                       : typeof m === 'string'
-                       ? m
-                       : String(m ?? '');
-                    const isSelf = speaker
-                       ? /you|me|self/i.test(speaker)
-                       : false;
+            {Array.isArray(item.conversation) ? (
+               item.conversation.map((m, i) => {
+                  const isObject = m && typeof m === 'object';
+                  const speaker = isObject && m.speaker ? m.speaker : '';
+                  const text = isObject
+                     ? m.text != null
+                        ? m.text
+                        : JSON.stringify(m)
+                     : typeof m === 'string'
+                     ? m
+                     : String(m ?? '');
+                  const isSelf = speaker ? /you|me|self/i.test(speaker) : false;
 
-                    return (
-                       <View
-                          key={i}
-                          style={[
-                             styles.msgBubble,
-                             isSelf
-                                ? styles.msgBubbleSelf
-                                : styles.msgBubblePeer,
-                             isHighlightedEntry &&
-                                highlightSet.has(i) &&
-                                styles.msgBubbleHighlight,
-                          ]}
-                       >
-                          {speaker ? (
-                             <Text
-                                style={[
-                                   styles.msgSpeaker,
-                                   isSelf && styles.msgSpeakerSelf,
-                                ]}
-                             >
-                                {speaker}
-                             </Text>
-                          ) : null}
-                          <Text style={styles.msgText}>{text}</Text>
-                       </View>
-                    );
-                 })
-               : (
-                    <View
-                       style={[
-                          styles.msgBubble,
-                          styles.msgBubblePeer,
-                          isHighlightedEntry && styles.msgBubbleHighlight,
-                       ]}
-                    >
-                       <Text style={styles.msgText}>
-                          {JSON.stringify(item.conversation)}
-                       </Text>
-                    </View>
-                 )}
+                  return (
+                     <View
+                        key={i}
+                        style={[
+                           styles.msgBubble,
+                           isSelf ? styles.msgBubbleSelf : styles.msgBubblePeer,
+                           isHighlightedEntry &&
+                              highlightSet.has(i) &&
+                              styles.msgBubbleHighlight,
+                        ]}
+                     >
+                        {speaker ? (
+                           <Text
+                              style={[
+                                 styles.msgSpeaker,
+                                 isSelf && styles.msgSpeakerSelf,
+                              ]}
+                           >
+                              {speaker}
+                           </Text>
+                        ) : null}
+                        <Text style={styles.msgText}>{text}</Text>
+                     </View>
+                  );
+               })
+            ) : (
+               <View
+                  style={[
+                     styles.msgBubble,
+                     styles.msgBubblePeer,
+                     isHighlightedEntry && styles.msgBubbleHighlight,
+                  ]}
+               >
+                  <Text style={styles.msgText}>
+                     {JSON.stringify(item.conversation)}
+                  </Text>
+               </View>
+            )}
          </View>
       );
    };
@@ -184,10 +180,15 @@ export default function ConversationScreen({
             </TouchableOpacity>
             <View style={styles.profileBubble}>
                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.profileAvatar} />
+                  <Image
+                     source={{ uri: avatarUrl }}
+                     style={styles.profileAvatar}
+                  />
                ) : (
                   <View style={styles.profileAvatarFallback}>
-                     <Text style={styles.profileAvatarFallbackText}>{initials}</Text>
+                     <Text style={styles.profileAvatarFallbackText}>
+                        {initials}
+                     </Text>
                   </View>
                )}
                <Text style={styles.profileName}>{name}</Text>
@@ -245,6 +246,7 @@ const styles = StyleSheet.create({
       borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
+      marginTop: 36,
       marginBottom: 16,
    },
    backText: {

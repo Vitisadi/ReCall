@@ -14,6 +14,10 @@ from analyzers.enroll_face import enroll
 # from analyzers.transcript_analyzer import whisper_model
 from analyzers.face_analyzer import face_app
 from services.linkedin_enricher import enrich_linkedin_profile
+from services.highlights import (
+    detect_and_store_highlights,
+    get_upcoming_highlights,
+)
 from google import genai
 
 print("✅ All AI models preloaded (Whisper + InsightFace). Ready to process requests.")
@@ -170,6 +174,13 @@ def get_conversation(name):
         return jsonify({"error": str(e)}), 500
     return jsonify({"name": name, "conversation": data})
 
+
+@app.route("/api/highlights", methods=["GET"])
+def list_highlights():
+    """Return upcoming highlight reminders detected from transcripts."""
+    highlights = get_upcoming_highlights()
+    return jsonify({"highlights": highlights})
+
 # process uploaded video
 """
 req: http://localhost:3000/api/process - POST
@@ -322,6 +333,21 @@ def save_conversation(data):
     existing.append(entry)
     path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     print(f"💾 Conversation history updated for: {name}")
+
+    try:
+        highlights_created = detect_and_store_highlights(
+            person_name=name,
+            conversation=entry.get("conversation", []),
+            conversation_timestamp=entry.get("timestamp", int(time.time())),
+            gemini_client=gemini_client,
+            headline=entry.get("headline"),
+        )
+        if highlights_created:
+            print(
+                f"⭐ Added {len(highlights_created)} highlight(s) for {name}."
+            )
+    except Exception as exc:
+        print(f"⚠️ Failed to record highlights for {name}: {exc}")
 
 def enrich_latest_linkedin(name, force=False):
     """Fetch or update LinkedIn info for the most recent conversation entry."""

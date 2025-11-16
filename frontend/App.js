@@ -13,6 +13,7 @@ import HomeScreen from './screens/HomeScreen';
 import PeopleScreen from './screens/PeopleScreen';
 import UploadScreen from './screens/UploadScreen';
 import ConversationScreen from './screens/ConversationScreen';
+import HighlightsScreen from './screens/HighlightsScreen';
 
 const AGREEMENT_STORAGE_KEY = 'upload_agreement_accepted_v1';
 
@@ -164,6 +165,11 @@ export default function App() {
                         onOpenConversation={handleOpenConversation}
                      />
                   )}
+                  {activeTab === 'highlights' && (
+                     <HighlightsScreen
+                        onOpenConversation={handleOpenConversation}
+                     />
+                  )}
                </>
             )}
 
@@ -226,8 +232,29 @@ export default function App() {
                         styles.navText,
                         activeTab === 'memory' && styles.navTextActive,
                      ]}
-                  >
+                     >
                      Memory
+                  </Text>
+               </TouchableOpacity>
+
+               <TouchableOpacity
+                  style={[
+                     styles.navItem,
+                     styles.navSeparator,
+                     activeTab === 'highlights' && styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                     setActiveConversation(null);
+                     setActiveTab('highlights');
+                  }}
+               >
+                  <Text
+                     style={[
+                        styles.navText,
+                        activeTab === 'highlights' && styles.navTextActive,
+                     ]}
+                  >
+                     Highlights
                   </Text>
                </TouchableOpacity>
             </View>
@@ -329,6 +356,10 @@ const styles = StyleSheet.create({
       paddingVertical: 16,
       alignItems: 'center',
       justifyContent: 'center',
+   },
+   navSeparator: {
+      borderLeftWidth: 1,
+      borderLeftColor: '#eee',
    },
    navItemActive: {
       borderTopWidth: 3,
