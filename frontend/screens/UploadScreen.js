@@ -14,6 +14,10 @@ export default function UploadScreen() {
   const [showConfirmPrompt, setShowConfirmPrompt] = useState(false);
   const [keywordsVisible, setKeywordsVisible] = useState(false);
   const [linkedinUrl, setLinkedinUrl] = useState(null);
+  const [linkedinLoading, setLinkedinLoading] = useState(false);
+  const [linkedinProgress, setLinkedinProgress] = useState(0);
+  const linkedinTimer = useRef(null);
+  const [linkedinMessage, setLinkedinMessage] = useState('');
 
   const pickVideo = async () => {
     try {
@@ -95,6 +99,7 @@ export default function UploadScreen() {
   useEffect(() => {
     return () => {
       if (progressTimer.current) clearInterval(progressTimer.current);
+      if (linkedinTimer.current) clearInterval(linkedinTimer.current);
     };
   }, []);
 
@@ -207,6 +212,37 @@ export default function UploadScreen() {
     }
   };
 
+  // Fetch latest headline from the conversation file and update card
+  const updateHeadlineFromConversation = async (personName) => {
+    if (!personName) return;
+    try {
+      const resp = await fetch(`${BASE_URL}/api/conversation/${encodeURIComponent(personName)}`);
+      if (!resp.ok) return;
+      const payload = await resp.json();
+      const conversations = Array.isArray(payload?.conversation) ? payload.conversation : [];
+      let latestHeadline = '';
+      for (let i = conversations.length - 1; i >= 0; i--) {
+        const entry = conversations[i];
+        if (entry && typeof entry.headline === 'string' && entry.headline.trim()) {
+          latestHeadline = entry.headline.trim();
+          break;
+        }
+      }
+      if (latestHeadline) {
+        setResult((prev) => (prev ? { ...prev, data: { ...prev.data, headline: latestHeadline } } : prev));
+      }
+    } catch (_) {
+      // ignore refresh errors silently
+    }
+  };
+
+  // Format a headline for display (length cap)
+  const formatHeadline = (s) => {
+    if (!s || typeof s !== 'string') return '';
+    const t = s.trim();
+    return t.length > 50 ? `${t.slice(0, 50).trim()}…` : t;
+  };
+
   // Simple horizontal progress bar used for each step
   const ProgressBar = ({ progress }) => {
     return (
@@ -273,7 +309,9 @@ export default function UploadScreen() {
               {!isEditingName && !showConfirmPrompt && (
                 <>
                   <Text style={styles.cardName}>{result.data.face_name.toUpperCase()}</Text>
-                  <Text style={styles.cardSubtext}>Conversation saved</Text>
+                  <Text style={styles.cardSubtext}>
+                    {result.data.headline ? formatHeadline(result.data.headline) : 'Conversation saved'}
+                  </Text>
                 </>
               )}
               {isEditingName && !showConfirmPrompt && (
@@ -338,11 +376,11 @@ export default function UploadScreen() {
                     }
                     // If unchanged, just exit without calling backend
                     if (newName.toLowerCase() === result.data.face_name.toLowerCase()) {
-                      await triggerLinkedInEnrichment(newName);
+                      // Do not fetch LinkedIn or show keywords yet; mirror non-edit flow
                       setIsEditingName(false);
                       setShowConfirmPrompt(false);
-                      setKeywordsVisible(true);
-                      Alert.alert('Confirmed', 'Name unchanged.');
+                      setKeywordsVisible(false);
+                      Alert.alert('Saved', 'Name unchanged. Tap CONFIRM to continue.');
                       return;
                     }
                     try {
@@ -354,11 +392,11 @@ export default function UploadScreen() {
                       const data = await res.json();
                       if (res.ok) {
                         setResult({ ...result, data: { ...result.data, face_name: newName } });
-                        await triggerLinkedInEnrichment(newName, { force: true });
+                        // Defer enrichment to the CONFIRM action for consistent flow
                         setIsEditingName(false);
                         setShowConfirmPrompt(false);
-                        setKeywordsVisible(true);
-                        Alert.alert('Success', 'Name updated!');
+                        setKeywordsVisible(false);
+                        Alert.alert('Success', 'Name updated! Tap CONFIRM to continue.');
                       } else {
                         Alert.alert('Error', data.error || 'Failed to rename');
                       }
@@ -424,15 +462,41 @@ export default function UploadScreen() {
         </View>
       )}
       {result && result.ok && result.data.face_name && !isEditingName && !showConfirmPrompt && !keywordsVisible && (
-        <TouchableOpacity
-          style={styles.confirmAcceptButton}
-          onPress={async () => {
-            await triggerLinkedInEnrichment(result.data.face_name);
-            setKeywordsVisible(true);
-          }}
-        >
-          <Text style={styles.confirmAcceptText}>CONFIRM ▶ SHOW KEYWORDS</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            style={styles.confirmAcceptButton}
+            onPress={async () => {
+              if (!result?.data?.face_name || linkedinLoading) return;
+              setLinkedinLoading(true);
+              setLinkedinProgress(0);
+              // simple progress animation
+              linkedinTimer.current = setInterval(() => {
+                setLinkedinProgress((p) => Math.min(94, p + (5 + Math.random() * 7)));
+              }, 280);
+              try {
+                await triggerLinkedInEnrichment(result.data.face_name);
+                await updateHeadlineFromConversation(result.data.face_name);
+              } finally {
+                if (linkedinTimer.current) {
+                  clearInterval(linkedinTimer.current);
+                  linkedinTimer.current = null;
+                }
+                setLinkedinProgress(100);
+                setLinkedinLoading(false);
+                // Always reveal keywords after enrichment attempt
+                setKeywordsVisible(true);
+              }
+            }}
+          >
+            <Text style={styles.confirmAcceptText}>Find More Data</Text>
+          </TouchableOpacity>
+          {linkedinLoading && (
+            <View style={{ width: '100%', marginTop: 8 }}>
+              <ProgressBar progress={linkedinProgress} />
+            </View>
+          )}
+          
+        </>
       )}
 
         {result && !result.ok && (
